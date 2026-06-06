@@ -1,0 +1,30 @@
+{
+  "name": "@datadocs/web",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.43.0",
+    "@datadocs/core": "workspace:*",
+    "@hocuspocus/provider": "^4.1.0",
+    "codemirror": "^6.0.2",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "y-codemirror.next": "^0.3.5",
+    "yjs": "^13.6.31"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
+  }
+}

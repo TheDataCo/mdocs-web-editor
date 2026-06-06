@@ -1,0 +1,13 @@
+{
+  "name": "datadocs",
+  "private": true,
+  "scripts": {
+    "dev:server": "pnpm --filter @datadocs/server dev",
+    "dev:web": "pnpm --filter @datadocs/web dev",
+    "db:push": "pnpm --filter @datadocs/server db:push",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}

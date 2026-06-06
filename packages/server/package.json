@@ -1,0 +1,28 @@
+{
+  "name": "@datadocs/server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "db:push": "drizzle-kit push",
+    "typecheck": "tsc --noEmit",
+    "sync-check": "tsx scripts/sync-check.ts"
+  },
+  "dependencies": {
+    "@datadocs/core": "workspace:*",
+    "@hocuspocus/server": "^4.1.0",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9",
+    "yjs": "^13.6.31"
+  },
+  "devDependencies": {
+    "@hocuspocus/provider": "^4.1.0",
+    "@types/node": "^25.9.2",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}

@@ -66,6 +66,7 @@ export async function appendUpdate(
         ${meta.requestId ?? null}
       )
     `
+    await tx`update docs set updated_at = now() where id = ${docId}`
   })
 }
 

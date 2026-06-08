@@ -21,6 +21,32 @@ body {
   font-size: 15px;
   font-weight: 600;
   margin: 0;
+  flex: 1;
+}
+
+.back {
+  text-decoration: none;
+  color: #555;
+  font-size: 16px;
+}
+
+.btn {
+  font-size: 13px;
+  padding: 5px 12px;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: #f5f5f5;
+}
+
+.btn kbd {
+  font-size: 10px;
+  color: #999;
+  margin-left: 4px;
 }
 
 .status {
@@ -48,6 +74,83 @@ body {
 
 .cm-editor.cm-focused {
   outline: none;
+}
+
+.preview-wrap {
+  max-width: 860px;
+  margin: 24px auto;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  padding: 24px 32px;
+  min-height: 70vh;
+  line-height: 1.6;
+  font-size: 15px;
+}
+
+.preview-wrap pre {
+  background: #f6f8fa;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.preview-wrap code {
+  font-size: 13px;
+}
+
+.preview-wrap blockquote {
+  border-left: 3px solid #ddd;
+  margin-left: 0;
+  padding-left: 16px;
+  color: #555;
+}
+
+.preview-wrap table {
+  border-collapse: collapse;
+}
+
+.preview-wrap th,
+.preview-wrap td {
+  border: 1px solid #ddd;
+  padding: 6px 12px;
+}
+
+.doclist {
+  max-width: 860px;
+  margin: 24px auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.doclist-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.doclist-item:hover {
+  border-color: #bbb;
+}
+
+.doclist-title {
+  font-weight: 500;
+}
+
+.muted {
+  color: #999;
+  font-size: 13px;
+}
+
+.error {
+  color: #c33;
 }
 
 /* y-codemirror.next remote cursor styles */

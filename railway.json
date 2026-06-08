@@ -1,5 +1,8 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "buildCommand": "pnpm --filter @datadocs/web build"
+  },
   "deploy": {
     "startCommand": "pnpm --filter @datadocs/server start",
     "restartPolicyType": "ON_FAILURE"

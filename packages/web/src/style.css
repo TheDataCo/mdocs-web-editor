@@ -169,8 +169,41 @@ body {
   overflow-y: auto;
 }
 
-.panes.split .pane-editor {
-  border-right: 1px solid var(--border);
+/* Hover-reveal divider carrying the preview collapse/expand handle. */
+.divider {
+  position: relative;
+  flex-shrink: 0;
+  width: 9px;
+  cursor: pointer;
+  border-left: 1px solid var(--border);
+}
+
+.divider:hover {
+  background: var(--muted);
+}
+
+.divider-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 18px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity 0.12s;
+  z-index: 5;
+}
+
+.divider:hover .divider-btn {
+  opacity: 1;
 }
 
 .panes.preview {

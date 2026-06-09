@@ -63,6 +63,8 @@ export function EditorPage() {
   const titleSaveRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const toggleRef = useRef(() => {})
   toggleRef.current = () => setMode(modeRef.current === 'preview' ? 'split' : 'preview')
+  const previewToggleRef = useRef(() => {})
+  previewToggleRef.current = togglePreview
 
   // Load access: redeem a share link if present in the URL, then fetch the doc
   // + the caller's edit permission. Gate the editor build on this completing.
@@ -146,7 +148,10 @@ export function EditorPage() {
 
     const view = new EditorView({
       extensions: [
-        keymap.of([{ key: 'Mod-e', run: () => (toggleRef.current(), true) }]),
+        keymap.of([
+          { key: 'Mod-e', run: () => (toggleRef.current(), true) },
+          { key: 'Mod-p', preventDefault: true, run: () => (previewToggleRef.current(), true) },
+        ]),
         keymap.of(yUndoManagerKeymap),
         basicSetup,
         markdown(),
@@ -196,6 +201,12 @@ export function EditorPage() {
       if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'e') {
         e.preventDefault()
         toggleRef.current()
+        return
+      }
+      // Cmd/Ctrl+P toggles the preview pane (only meaningful in split mode).
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'p' && modeRef.current === 'split') {
+        e.preventDefault()
+        previewToggleRef.current()
         return
       }
       // Only auto-jump to split for editors; viewers stay in read mode.
@@ -273,15 +284,6 @@ export function EditorPage() {
               )}
             </div>
           )}
-          {mode === 'split' && (
-            <button
-              className="btn"
-              onClick={togglePreview}
-              title={previewCollapsed ? 'Show preview' : 'Hide preview'}
-            >
-              {previewCollapsed ? 'Show preview' : 'Hide preview'}
-            </button>
-          )}
           <button className="btn" onClick={() => toggleRef.current()} title="Toggle view (Cmd+E)">
             {mode === 'preview' ? 'Edit' : 'Read'} <kbd>⌘E</kbd>
           </button>
@@ -290,6 +292,15 @@ export function EditorPage() {
         </div>
         <div className={`panes ${mode} ${previewCollapsed ? 'preview-hidden' : ''}`}>
           <div className="pane pane-editor" ref={editorRef} />
+          {mode === 'split' && (
+            <div
+              className="divider"
+              onClick={togglePreview}
+              title={previewCollapsed ? 'Show preview (⌘P)' : 'Hide preview (⌘P)'}
+            >
+              <span className="divider-btn">{previewCollapsed ? '‹' : '›'}</span>
+            </div>
+          )}
           <div className="pane pane-preview" ref={previewRef} onDoubleClick={onPreviewDoubleClick}>
             <div className="preview-inner">
               <Preview text={text} />

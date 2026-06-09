@@ -19,7 +19,11 @@ export function DocTree({ activeDocId }: { activeDocId?: string }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropWs, setDropWs] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
   const navigate = useNavigate()
+
+  const q = query.trim().toLowerCase()
+  const matches = (d: DocMeta) => !q || d.title.toLowerCase().includes(q)
 
   const refresh = useCallback(async () => {
     const [ws, ds] = await Promise.all([listWorkspaces(), listDocs()])
@@ -62,10 +66,20 @@ export function DocTree({ activeDocId }: { activeDocId?: string }) {
       <div className="tree-head">
         <Wordmark />
       </div>
+      <div className="tree-search">
+        <input
+          type="search"
+          placeholder="Search docs…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </div>
       <div className="tree-body">
         {workspaces.map((w) => {
-          const wsDocs = docs.filter((d) => d.workspaceId === w.id)
-          const isCollapsed = collapsed.has(w.id)
+          const wsDocs = docs.filter((d) => d.workspaceId === w.id && matches(d))
+          // While searching, hide workspaces with no matches and force-expand the rest.
+          if (q && wsDocs.length === 0) return null
+          const isCollapsed = collapsed.has(w.id) && !q
           return (
             <div key={w.id} className="tree-ws">
               <div

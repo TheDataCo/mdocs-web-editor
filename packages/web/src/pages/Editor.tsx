@@ -6,7 +6,7 @@ import type { DocMeta } from '@datadocs/core'
 import { DOC_TEXT_FIELD } from '@datadocs/core'
 import { basicSetup, EditorView } from 'codemirror'
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next'
 import * as Y from 'yjs'
 import { getDoc, renameDoc, shareDoc } from '../api'
@@ -15,7 +15,9 @@ import { DocTree } from '../components/DocTree'
 import { WS_URL } from '../config'
 import { Preview } from './Preview'
 
-type Mode = 'raw' | 'preview'
+// 'split' = source + live preview side by side (editing); 'preview' = single
+// rendered reading pane.
+type Mode = 'split' | 'preview'
 
 const COLORS = ['#30bced', '#6eeb83', '#ffbc42', '#ee6352', '#9ac2c9', '#8acb88', '#e36397']
 const NAMES = ['Ada', 'Grace', 'Edsger', 'Barbara', 'Donald', 'Margaret', 'Alan']
@@ -25,9 +27,9 @@ export function EditorPage() {
   const [meta, setMeta] = useState<DocMeta | null>(null)
   const [status, setStatus] = useState('connecting')
   const [text, setText] = useState('')
-  // Raw is the default editing surface; last choice remembered per doc.
+  // Split (source + live preview) is the default; last choice remembered per doc.
   const [mode, setMode] = useState<Mode>(() =>
-    localStorage.getItem(`datadocs:view:${id}`) === 'preview' ? 'preview' : 'raw',
+    localStorage.getItem(`datadocs:view:${id}`) === 'preview' ? 'preview' : 'split',
   )
 
   const editorRef = useRef<HTMLDivElement>(null)
@@ -36,7 +38,7 @@ export function EditorPage() {
   const modeRef = useRef(mode)
   const titleSaveRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const toggleRef = useRef(() => {})
-  toggleRef.current = () => setMode(modeRef.current === 'raw' ? 'preview' : 'raw')
+  toggleRef.current = () => setMode(modeRef.current === 'preview' ? 'split' : 'preview')
 
   useEffect(() => {
     getDoc(id!).then(setMeta, () =>
@@ -115,29 +117,15 @@ export function EditorPage() {
     }
   }, [id])
 
-  // Mode side effects: persist choice; entering raw focuses the editor,
-  // entering preview scrolls to the block containing the cursor.
+  // Mode side effects: persist choice; entering split focuses the editor.
   useEffect(() => {
     modeRef.current = mode
     localStorage.setItem(`datadocs:view:${id}`, mode)
-    const view = viewRef.current
-    if (!view) return
-    if (mode === 'raw') {
-      view.focus()
-      view.dispatch({ scrollIntoView: true })
-    } else if (previewRef.current) {
-      const cursorLine = view.state.doc.lineAt(view.state.selection.main.head).number
-      let target: Element | null = null
-      for (const el of previewRef.current.querySelectorAll('[data-line]')) {
-        if (Number(el.getAttribute('data-line')) <= cursorLine) target = el
-        else break
-      }
-      target?.scrollIntoView({ block: 'center' })
-    }
+    if (mode === 'split') viewRef.current?.focus()
   }, [mode, id])
 
-  // Global keys: Cmd/Ctrl+E anywhere; in preview, Shift+V or any printable
-  // keypress drops into raw ("when editing, always raw" — made automatic).
+  // Global keys: Cmd/Ctrl+E toggles; in preview, any printable key jumps to
+  // split so you can start editing immediately.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.defaultPrevented) return // CodeMirror already handled it
@@ -149,14 +137,15 @@ export function EditorPage() {
       if (modeRef.current !== 'preview' || e.metaKey || e.ctrlKey || e.altKey) return
       if (e.key.length === 1) {
         e.preventDefault()
-        setMode('raw')
+        setMode('split')
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  // Double-click a preview block → raw, cursor at that block's source line.
+  // Double-click a preview block → put the cursor at that source line (and, in
+  // single-pane preview, switch to split so the editor is visible).
   function onPreviewDoubleClick(e: React.MouseEvent) {
     const view = viewRef.current
     const el = (e.target as HTMLElement).closest('[data-line]')
@@ -164,7 +153,7 @@ export function EditorPage() {
       const line = Math.min(Number(el.getAttribute('data-line')) || 1, view.state.doc.lines)
       view.dispatch({ selection: { anchor: view.state.doc.line(line).from }, scrollIntoView: true })
     }
-    setMode('raw')
+    if (modeRef.current === 'preview') setMode('split')
   }
 
   return (
@@ -172,9 +161,6 @@ export function EditorPage() {
       <DocTree activeDocId={id} />
       <div className="editor-main">
         <div className="topbar">
-          <Link to="/" className="back" aria-label="Back to documents">
-            ←
-          </Link>
           <input
             className="title-input"
             value={meta?.title ?? ''}
@@ -187,20 +173,17 @@ export function EditorPage() {
             Share
           </button>
           <button className="btn" onClick={() => toggleRef.current()} title="Toggle view (Cmd+E)">
-            {mode === 'raw' ? 'Preview' : 'Edit'} <kbd>⌘E</kbd>
+            {mode === 'preview' ? 'Edit' : 'Read'} <kbd>⌘E</kbd>
           </button>
           <span className={`status ${status}`}>{status}</span>
           <UserButton />
         </div>
-        <div className="editor-scroll">
-          <div className="editor-wrap" ref={editorRef} style={{ display: mode === 'raw' ? undefined : 'none' }} />
-          <div
-            className="preview-wrap"
-            ref={previewRef}
-            onDoubleClick={onPreviewDoubleClick}
-            style={{ display: mode === 'preview' ? undefined : 'none' }}
-          >
-            <Preview text={text} />
+        <div className={`panes ${mode}`}>
+          <div className="pane pane-editor" ref={editorRef} />
+          <div className="pane pane-preview" ref={previewRef} onDoubleClick={onPreviewDoubleClick}>
+            <div className="preview-inner">
+              <Preview text={text} />
+            </div>
           </div>
         </div>
       </div>

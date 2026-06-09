@@ -23,6 +23,8 @@ function required(name: string): string {
 
 export const env = {
   DATABASE_URL: required('DATABASE_URL'),
+  CLERK_SECRET_KEY: required('CLERK_SECRET_KEY'),
+  // Server-only service credential (sync-check / admin). NEVER shipped to browsers.
   COLLAB_TOKEN: process.env.COLLAB_TOKEN ?? 'dev-token',
   PORT: Number(process.env.PORT ?? 3001),
 }

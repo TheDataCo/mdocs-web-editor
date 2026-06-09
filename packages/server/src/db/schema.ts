@@ -17,6 +17,7 @@ const bytea = customType<{ data: Uint8Array }>({
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
+  clerkId: text('clerk_id').unique(),
   email: text('email').notNull().unique(),
   name: text('name'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

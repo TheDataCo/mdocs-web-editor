@@ -11,6 +11,7 @@
     "sync-check": "tsx scripts/sync-check.ts"
   },
   "dependencies": {
+    "@clerk/backend": "^3.5.0",
     "@datadocs/core": "workspace:*",
     "@hocuspocus/server": "^4.1.0",
     "@hono/node-server": "^2.0.4",

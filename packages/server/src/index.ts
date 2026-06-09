@@ -4,20 +4,38 @@ import { Hocuspocus } from '@hocuspocus/server'
 import { WebSocketServer } from 'ws'
 import * as Y from 'yjs'
 import { createApi } from './api.js'
+import { authenticate, type Principal } from './auth.js'
+import { canAccess, docExists, joinDoc } from './docs.js'
 import { env } from './env.js'
 import { appendUpdate, ensureDoc, loadDocState, saveSnapshot } from './persistence.js'
 
+interface ConnContext {
+  principal: Principal
+}
+
 const hocuspocus = new Hocuspocus({
-  // Milestone-1 auth: shared secret. Real per-user tokens land in milestone 3;
-  // authorization stays enforced here (ws layer), not only in the HTTP API.
-  async onAuthenticate({ token }) {
-    if (token !== env.COLLAB_TOKEN) {
-      throw new Error('unauthorized')
+  // Authenticate the connection (Clerk JWT, dd_ CLI token, or service token) and
+  // authorize access to this specific doc. Returning a value sets the context.
+  async onAuthenticate({ token, documentName }): Promise<ConnContext> {
+    const principal = await authenticate(token)
+    if (!principal) throw new Error('unauthorized')
+
+    if (principal.kind === 'user') {
+      // Service token may create docs implicitly; real users may only open
+      // existing docs — and opening one auto-joins them (anyone-with-the-link).
+      if (!(await docExists(documentName))) throw new Error('not found')
+      if (!(await canAccess(principal, documentName))) {
+        await joinDoc(principal.userId, documentName)
+      }
     }
+    return { principal }
   },
 
-  async onLoadDocument({ documentName, document }) {
-    await ensureDoc(documentName)
+  async onLoadDocument({ documentName, document, context }) {
+    // Service connections lazily create docs (used by sync-check / tooling).
+    if ((context as ConnContext)?.principal?.kind === 'service') {
+      await ensureDoc(documentName)
+    }
     const persisted = await loadDocState(documentName)
     Y.applyUpdate(document, Y.encodeStateAsUpdate(persisted))
     persisted.destroy()
@@ -25,11 +43,12 @@ const hocuspocus = new Hocuspocus({
   },
 
   // Fires per client-originated update: append to the log before the hook
-  // resolves (append-then-broadcast).
+  // resolves (append-then-broadcast), attributed to the connection's user.
   async onChange({ documentName, update, context }) {
+    const principal = (context as ConnContext)?.principal
     await appendUpdate(documentName, update, {
       origin: 'websocket',
-      clientId: context?.clientId ?? null,
+      authorId: principal?.kind === 'user' ? principal.userId : null,
     })
   },
 

@@ -1,3 +1,4 @@
+import { UserButton } from '@clerk/clerk-react'
 import { markdown } from '@codemirror/lang-markdown'
 import { keymap } from '@codemirror/view'
 import { HocuspocusProvider } from '@hocuspocus/provider'
@@ -9,7 +10,8 @@ import { Link, useParams } from 'react-router-dom'
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next'
 import * as Y from 'yjs'
 import { getDoc } from '../api'
-import { TOKEN, WS_URL } from '../config'
+import { getToken } from '../auth'
+import { WS_URL } from '../config'
 import { Preview } from './Preview'
 
 type Mode = 'raw' | 'preview'
@@ -43,7 +45,7 @@ export function EditorPage() {
     const provider = new HocuspocusProvider({
       url: WS_URL,
       name: id!,
-      token: TOKEN,
+      token: getToken, // Clerk session token, refreshed per (re)connect
       document: doc,
       onStatus({ status }) {
         setStatus(status)
@@ -147,6 +149,7 @@ export function EditorPage() {
           {mode === 'raw' ? 'Preview' : 'Edit'} <kbd>⌘E</kbd>
         </button>
         <span className={`status ${status}`}>{status}</span>
+        <UserButton />
       </div>
       <div className="editor-wrap" ref={editorRef} style={{ display: mode === 'raw' ? undefined : 'none' }} />
       <div

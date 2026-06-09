@@ -40,6 +40,21 @@ export function EditorPage() {
   const [mode, setMode] = useState<Mode>(() =>
     localStorage.getItem(`datadocs:view:${id}`) === 'preview' ? 'preview' : 'split',
   )
+  const [treeCollapsed, setTreeCollapsed] = useState(() => localStorage.getItem('mdocs:sidebar') === '1')
+  const [previewCollapsed, setPreviewCollapsed] = useState(() => localStorage.getItem('mdocs:preview') === '1')
+
+  function toggleTree() {
+    setTreeCollapsed((v) => {
+      localStorage.setItem('mdocs:sidebar', v ? '0' : '1')
+      return !v
+    })
+  }
+  function togglePreview() {
+    setPreviewCollapsed((v) => {
+      localStorage.setItem('mdocs:preview', v ? '0' : '1')
+      return !v
+    })
+  }
 
   const editorRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
@@ -163,6 +178,11 @@ export function EditorPage() {
     if (mode === 'split') viewRef.current?.focus()
   }, [mode, id])
 
+  // CodeMirror must re-measure when the panes resize (preview show/hide).
+  useEffect(() => {
+    viewRef.current?.requestMeasure()
+  }, [previewCollapsed, treeCollapsed])
+
   // Close the share menu on any outside click.
   useEffect(() => {
     const close = () => setShareOpen(false)
@@ -201,9 +221,12 @@ export function EditorPage() {
 
   return (
     <div className="editor-shell">
-      <DocTree activeDocId={id} />
+      {!treeCollapsed && <DocTree activeDocId={id} />}
       <div className="editor-main">
         <div className="topbar">
+          <button className="icon-btn" onClick={toggleTree} title="Toggle sidebar" aria-label="Toggle sidebar">
+            ☰
+          </button>
           <input
             className="title-input"
             value={meta?.title ?? ''}
@@ -250,13 +273,22 @@ export function EditorPage() {
               )}
             </div>
           )}
+          {mode === 'split' && (
+            <button
+              className="btn"
+              onClick={togglePreview}
+              title={previewCollapsed ? 'Show preview' : 'Hide preview'}
+            >
+              {previewCollapsed ? 'Show preview' : 'Hide preview'}
+            </button>
+          )}
           <button className="btn" onClick={() => toggleRef.current()} title="Toggle view (Cmd+E)">
             {mode === 'preview' ? 'Edit' : 'Read'} <kbd>⌘E</kbd>
           </button>
           <span className={`status ${status}`}>{status}</span>
           <UserButton />
         </div>
-        <div className={`panes ${mode}`}>
+        <div className={`panes ${mode} ${previewCollapsed ? 'preview-hidden' : ''}`}>
           <div className="pane pane-editor" ref={editorRef} />
           <div className="pane pane-preview" ref={previewRef} onDoubleClick={onPreviewDoubleClick}>
             <div className="preview-inner">

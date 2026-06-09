@@ -1,5 +1,4 @@
 import { ClerkProvider, RedirectToSignIn, SignedIn, SignedOut, useAuth } from '@clerk/clerk-react'
-import { useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { setTokenGetter } from './auth'
@@ -14,11 +13,12 @@ const router = createBrowserRouter([
 ])
 
 // Register Clerk's getToken so api.ts and the websocket can fetch session tokens.
+// Set it DURING render (not in an effect): child route effects run before parent
+// effects, so an effect here would register the getter too late and the first
+// API call would go out with an empty token (401).
 function AuthBridge() {
   const { getToken, isLoaded } = useAuth()
-  useEffect(() => {
-    setTokenGetter(() => getToken())
-  }, [getToken])
+  setTokenGetter(() => getToken())
   if (!isLoaded) return null
   return <RouterProvider router={router} />
 }

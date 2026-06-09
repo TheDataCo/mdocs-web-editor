@@ -37,9 +37,9 @@ SSO, billing).
 |---|---|---|
 | Live shared editor (presence, cursors) | ✅ | The headline feature |
 | Raw markdown + rendered preview views | ✅ | Editing only ever happens in raw view |
-| CLI: `login`, `ls`, `new`, `pull`, `push`, `diff` | ✅ | Agent-first; JSON output + stable error codes |
+| CLI: `login`, `ls`, `new`, `pull`, `push`, `diff` | ✅ | Separate repo `docs-cli`; auth via `dd_` token from the app |
 | Backend: ws sync + HTTP API + Postgres | ✅ | |
-| Minimal auth (accounts, API tokens, invite/link sharing) | ✅ | Everyone with access can edit (no viewer role yet) |
+| Auth: Clerk (web) + `dd_` API tokens (CLI) | ✅ | Everyone with access can edit (no viewer role yet) |
 | Markdown sanitization in preview | ✅ | XSS is a day-one concern, not a polish item |
 | Comments (threaded, anchored, resolvable) | ⏳ designed-for | Anchors = relative position + excerpt + state |
 | Suggestion mode (tracked changes, accept/reject) | ⏳ designed-for | Model is an **open design question** (see below) |
@@ -224,8 +224,15 @@ room requires edit access to that doc; awareness state never crosses docs).
 
 ## CLI spec
 
-Binary name TBD — **not `dd`** (unix collision; decide before implementation;
-candidates: `ddoc`, `mdoc`, `datadocs` with short alias).
+**Lives in a separate repo, `docs-cli`** (not a package in this monorepo). It
+consumes only the public HTTP API + websocket, authenticating with a `dd_` token
+the user generates in the web app ("CLI token" button → `/api/tokens`). It does
+*not* depend on Clerk. Shared logic (the diff→rebase→Yjs-ops pipeline) is
+factored into `@datadocs/core`; the CLI repo will consume it via a published
+package or a vendored copy (decide when that repo starts).
+
+Binary name TBD — **not `dd`** (unix collision; candidates: `ddoc`, `mdoc`,
+`datadocs` with short alias).
 
 - `login` — obtain/store an API token (paste-token first; device-code later)
 - `ls` — list accessible docs
@@ -262,8 +269,13 @@ vector). Properties:
    duplicate sessions from one user, and a large-doc (1MB) smoke test.
 2. **Web app** — doc list, editor page: CodeMirror + presence cursors, sanitized
    preview, `Cmd+E` toggle, block-level position mapping, `Y.UndoManager`.
-3. **HTTP API + auth** — accounts (email/password — no email-sending dependency
-   for self-host), API tokens, doc CRUD + access + link shares, `login`.
+3. **HTTP API + auth** ✅ — **Clerk** for web sign-in; a `principal` is resolved
+   from a Clerk session JWT, a `dd_` API token (CLI), or a server-only
+   `COLLAB_TOKEN` service credential. Both the HTTP API and the Hocuspocus
+   connection verify; ws also authorizes per-doc (users open existing docs and
+   auto-join as editor; service may create). `dd_` tokens are issued/listed/
+   revoked via `/api/tokens` (hash-stored, plaintext shown once) — this is how
+   the separate **docs-cli** repo and agents authenticate.
 4. **CLI** — `ls`, `new`, `pull`, `push`, `diff`, with the rebase-on-push
    pipeline and `patch_conflict` flow in `core`. Ends with the headline demo:
    agent pushes into a live editing session — clean merge on disjoint edits,

@@ -36,7 +36,8 @@ body {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 12px 20px;
+  height: 57px;
+  padding: 0 20px;
   background: var(--background);
   border-bottom: 1px solid var(--border);
 }
@@ -222,7 +223,10 @@ body {
 }
 
 .tree-head {
-  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  height: 57px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--border);
 }
 

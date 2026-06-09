@@ -1,8 +1,10 @@
-# datadocs
+# mdocs — Docs for Markdown
 
 **Google Docs for markdown files.** Live multiplayer editing in the browser,
 first-class CLI access for developers and agents, plain markdown as the
-interchange format.
+interchange format. Live at [mdocs.datacompany.dev](https://mdocs.datacompany.dev).
+
+> Repo/package names use `datadocs` internally; the product is **mdocs**.
 
 > ⚠️ Early development — currently at milestone 1 of 5 (sync core). See
 > [PLAN.md](./PLAN.md) for the full design and roadmap.

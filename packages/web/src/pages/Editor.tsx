@@ -141,10 +141,11 @@ export function EditorPage() {
   return (
     <>
       <div className="topbar">
-        <Link to="/" className="back">
+        <Link to="/" className="back" aria-label="Back to documents">
           ←
         </Link>
-        <h1>{meta?.title ?? '…'}</h1>
+        <span className="doclist-title">{meta?.title ?? '…'}</span>
+        <span className="spacer" />
         <button className="btn" onClick={() => toggleRef.current()} title="Toggle view (Cmd+E)">
           {mode === 'raw' ? 'Preview' : 'Edit'} <kbd>⌘E</kbd>
         </button>

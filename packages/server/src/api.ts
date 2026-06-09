@@ -85,7 +85,7 @@ export function createApi() {
     app.use('/*', serveStatic({ root: WEB_DIST }))
     app.get('/*', serveStatic({ root: WEB_DIST, path: 'index.html' }))
   } else {
-    app.get('/', (c) => c.text('datadocs sync server (no web build)'))
+    app.get('/', (c) => c.text('mdocs sync server (no web build)'))
   }
 
   return app

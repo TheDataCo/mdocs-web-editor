@@ -3,6 +3,7 @@ import type { DocMeta } from '@datadocs/core'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { createDoc, createToken, listDocs } from '../api'
+import { Wordmark } from '../components/Wordmark'
 
 export function DocListPage() {
   const [docs, setDocs] = useState<DocMeta[] | null>(null)
@@ -31,11 +32,12 @@ export function DocListPage() {
   return (
     <>
       <div className="topbar">
-        <h1>datadocs</h1>
+        <Wordmark />
+        <span className="spacer" />
         <button className="btn" onClick={onCreateToken} title="Generate a token for the CLI">
           CLI token
         </button>
-        <button className="btn" onClick={onCreate}>
+        <button className="btn primary" onClick={onCreate}>
           New doc
         </button>
         <UserButton />

@@ -61,7 +61,7 @@ const hocuspocus = new Hocuspocus({
 // One port: Hono answers HTTP, websocket upgrades go to Hocuspocus.
 const app = createApi()
 const httpServer = serve({ fetch: app.fetch, port: env.PORT, hostname: '0.0.0.0' }, (info) => {
-  console.log(`datadocs server (http + ws) listening on :${info.port}`)
+  console.log(`mdocs server (http + ws) listening on :${info.port}`)
 }) as HttpServer
 
 // Hocuspocus v4 takes a fetch-style Request; adapt the node upgrade request

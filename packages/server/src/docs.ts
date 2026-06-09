@@ -62,6 +62,19 @@ export async function createDoc(title: string, workspaceId: string, createdBy: s
   return doc!
 }
 
+export async function renameDoc(id: string, title: string): Promise<DocRow | undefined> {
+  const [row] = await sql<DocRow[]>`
+    update docs set title = ${title}, updated_at = now()
+    where id = ${id} and deleted_at is null
+    returning id, title, workspace_id, created_at, updated_at
+  `
+  return row
+}
+
+export async function softDeleteDoc(id: string): Promise<void> {
+  await sql`update docs set deleted_at = now() where id = ${id}`
+}
+
 /** Whether the principal may open/edit a doc: workspace membership or a direct share. */
 export async function canAccess(principal: Principal, docId: string): Promise<boolean> {
   if (principal.kind === 'service') return true

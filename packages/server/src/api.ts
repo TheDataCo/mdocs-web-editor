@@ -6,7 +6,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { authenticate, issueApiToken, type Principal } from './auth.js'
 import { sql } from './db/index.js'
-import { createDoc, getDoc, listDocs } from './docs.js'
+import { canAccess, createDoc, getDoc, listDocs, renameDoc, softDeleteDoc } from './docs.js'
 import {
   createTeamWorkspace,
   ensurePersonalWorkspace,
@@ -110,6 +110,46 @@ export function createApi() {
     const doc = await getDoc(c.req.param('id'))
     if (!doc) return c.json({ error: { code: 'not_found', message: 'no such doc' } }, 404)
     return c.json({ doc })
+  })
+
+  app.patch('/api/docs/:id', async (c) => {
+    const id = c.req.param('id')
+    if (!(await canAccess(c.get('principal'), id))) {
+      return c.json({ error: { code: 'permission_denied', message: 'no access' } }, 403)
+    }
+    const body = await c.req.json().catch(() => ({}))
+    const title = typeof body.title === 'string' ? body.title.trim() : ''
+    if (!title) return c.json({ error: { code: 'invalid', message: 'title required' } }, 400)
+    const doc = await renameDoc(id, title)
+    if (!doc) return c.json({ error: { code: 'not_found', message: 'no such doc' } }, 404)
+    return c.json({ doc })
+  })
+
+  app.delete('/api/docs/:id', async (c) => {
+    const id = c.req.param('id')
+    if (!(await canAccess(c.get('principal'), id))) {
+      return c.json({ error: { code: 'permission_denied', message: 'no access' } }, 403)
+    }
+    await softDeleteDoc(id)
+    return c.json({ ok: true })
+  })
+
+  // Share a single doc with a specific person (grants access outside its workspace).
+  app.post('/api/docs/:id/share', async (c) => {
+    const id = c.req.param('id')
+    if (!(await canAccess(c.get('principal'), id))) {
+      return c.json({ error: { code: 'permission_denied', message: 'no access' } }, 403)
+    }
+    const body = await c.req.json().catch(() => ({}))
+    const email = typeof body.email === 'string' ? body.email.trim() : ''
+    if (!email) return c.json({ error: { code: 'invalid', message: 'email required' } }, 400)
+    const [user] = await sql<{ id: string }[]>`select id from users where lower(email) = lower(${email})`
+    if (!user) return c.json({ result: { status: 'no_account' } })
+    await sql`
+      insert into doc_access (doc_id, user_id, role) values (${id}, ${user.id}, 'editor')
+      on conflict (doc_id, user_id) do nothing
+    `
+    return c.json({ result: { status: 'shared' } })
   })
 
   // CLI / API tokens (the "generate a token in the app" flow). Plaintext shown once.

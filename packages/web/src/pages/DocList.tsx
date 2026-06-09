@@ -1,26 +1,44 @@
 import { UserButton } from '@clerk/clerk-react'
 import type { DocMeta } from '@datadocs/core'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   createDoc,
   createToken,
   createWorkspace,
+  deleteDoc,
   inviteMember,
   listDocs,
   listWorkspaces,
+  renameDoc,
   type Workspace,
 } from '../api'
 import { Wordmark } from '../components/Wordmark'
+
+// "Untitled", then "Untitled 2", "Untitled 3", … based on existing titles.
+function nextUntitled(docs: DocMeta[]): string {
+  const nums = docs
+    .map((d) => {
+      if (d.title === 'Untitled') return 1
+      const m = d.title.match(/^Untitled (\d+)$/)
+      return m ? Number(m[1]) : 0
+    })
+    .filter((n) => n > 0)
+  if (nums.length === 0) return 'Untitled'
+  return `Untitled ${Math.max(...nums) + 1}`
+}
 
 export function DocListPage() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [docs, setDocs] = useState<DocMeta[] | null>(null)
+  const [query, setQuery] = useState('')
+  const [menuFor, setMenuFor] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
 
   const active = workspaces.find((w) => w.id === activeId) ?? null
+  const filtered = (docs ?? []).filter((d) => d.title.toLowerCase().includes(query.toLowerCase()))
 
   useEffect(() => {
     listWorkspaces().then(
@@ -38,10 +56,15 @@ export function DocListPage() {
     listDocs(activeId).then(setDocs, (e) => setError(String(e)))
   }, [activeId])
 
+  useEffect(() => {
+    const close = () => setMenuFor(null)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [])
+
   async function onCreate() {
-    const title = window.prompt('Document title', 'Untitled')
-    if (title === null || !activeId) return
-    const doc = await createDoc(title, activeId)
+    if (!activeId) return
+    const doc = await createDoc(nextUntitled(docs ?? []), activeId)
     navigate(`/d/${doc.id}`)
   }
 
@@ -59,6 +82,19 @@ export function DocListPage() {
     if (!email) return
     const { status } = await inviteMember(active.id, email)
     window.alert(status === 'added' ? `${email} added to ${active.name}` : `Invitation queued for ${email}`)
+  }
+
+  async function onRename(doc: DocMeta) {
+    const title = window.prompt('Rename document', doc.title)
+    if (!title || title === doc.title) return
+    setDocs((cur) => cur?.map((d) => (d.id === doc.id ? { ...d, title } : d)) ?? null) // optimistic
+    renameDoc(doc.id, title).catch(() => listDocs(activeId!).then(setDocs)) // revert from server on failure
+  }
+
+  async function onDelete(doc: DocMeta) {
+    if (!window.confirm(`Delete "${doc.title}"?`)) return
+    setDocs((cur) => cur?.filter((d) => d.id !== doc.id) ?? null) // optimistic
+    deleteDoc(doc.id).catch(() => listDocs(activeId!).then(setDocs))
   }
 
   async function onCreateToken() {
@@ -111,14 +147,42 @@ export function DocListPage() {
               </button>
             </div>
           </div>
-          <div className="doclist">
+
+          <input
+            className="search"
+            type="search"
+            placeholder="Search documents…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+
+          <div className="doclist compact">
             {docs === null && !error && <p className="muted">Loading…</p>}
-            {docs?.length === 0 && <p className="muted">No documents yet — create one.</p>}
-            {docs?.map((d) => (
-              <Link key={d.id} className="doclist-item" to={`/d/${d.id}`}>
+            {docs && filtered.length === 0 && (
+              <p className="muted">{query ? 'No matches.' : 'No documents yet — create one.'}</p>
+            )}
+            {filtered.map((d) => (
+              <div key={d.id} className="row" onClick={() => navigate(`/d/${d.id}`)}>
                 <span className="doclist-title">{d.title}</span>
-                <span className="muted">{new Date(d.updatedAt).toLocaleString()}</span>
-              </Link>
+                <span className="muted row-date">{new Date(d.updatedAt).toLocaleDateString()}</span>
+                <div className="row-menu" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className="kebab"
+                    onClick={() => setMenuFor(menuFor === d.id ? null : d.id)}
+                    aria-label="Document options"
+                  >
+                    ⋯
+                  </button>
+                  {menuFor === d.id && (
+                    <div className="menu">
+                      <button onClick={() => onRename(d)}>Rename</button>
+                      <button className="danger" onClick={() => onDelete(d)}>
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             ))}
           </div>
         </main>

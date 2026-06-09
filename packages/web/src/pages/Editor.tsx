@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next'
 import * as Y from 'yjs'
-import { getDoc } from '../api'
+import { getDoc, renameDoc, shareDoc } from '../api'
 import { getToken } from '../auth'
 import { WS_URL } from '../config'
 import { Preview } from './Preview'
@@ -33,12 +33,38 @@ export function EditorPage() {
   const previewRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const modeRef = useRef(mode)
+  const titleSaveRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const toggleRef = useRef(() => {})
   toggleRef.current = () => setMode(modeRef.current === 'raw' ? 'preview' : 'raw')
 
   useEffect(() => {
     getDoc(id!).then(setMeta, () => setMeta({ id: id!, title: 'Unknown doc', createdAt: '', updatedAt: '' }))
   }, [id])
+
+  // Inline title editing: update local state immediately (optimistic), debounce
+  // the persist so we're not firing a request per keystroke.
+  function onTitleChange(title: string) {
+    setMeta((m) => (m ? { ...m, title } : m))
+    clearTimeout(titleSaveRef.current)
+    titleSaveRef.current = setTimeout(() => {
+      if (title.trim()) renameDoc(id!, title.trim()).catch(() => {})
+    }, 500)
+  }
+
+  async function onShare() {
+    const email = window.prompt('Share with (email) — or leave blank to copy the link')
+    if (email && email.trim()) {
+      const { status } = await shareDoc(id!, email.trim())
+      window.alert(
+        status === 'shared'
+          ? `Shared with ${email}`
+          : `No mdocs account for ${email} yet — they can sign in, then you can share.`,
+      )
+      return
+    }
+    await navigator.clipboard?.writeText(window.location.href).catch(() => {})
+    window.alert('Link copied. (People you share with need access to open it.)')
+  }
 
   useEffect(() => {
     const doc = new Y.Doc()
@@ -144,8 +170,17 @@ export function EditorPage() {
         <Link to="/" className="back" aria-label="Back to documents">
           ←
         </Link>
-        <span className="doclist-title">{meta?.title ?? '…'}</span>
+        <input
+          className="title-input"
+          value={meta?.title ?? ''}
+          placeholder="Untitled"
+          onChange={(e) => onTitleChange(e.target.value)}
+          aria-label="Document title"
+        />
         <span className="spacer" />
+        <button className="btn" onClick={onShare}>
+          Share
+        </button>
         <button className="btn" onClick={() => toggleRef.current()} title="Toggle view (Cmd+E)">
           {mode === 'raw' ? 'Preview' : 'Edit'} <kbd>⌘E</kbd>
         </button>

@@ -283,10 +283,137 @@ body {
   gap: 8px;
 }
 
+.search {
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 0.8);
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.search:focus {
+  outline: none;
+  border-color: var(--ring);
+}
+
 .doclist {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+}
+
+/* Compact list rows */
+.doclist.compact .row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: calc(var(--radius) * 0.7);
+  cursor: pointer;
+  position: relative;
+}
+
+.doclist.compact .row:hover {
+  background: var(--muted);
+}
+
+.doclist.compact .doclist-title {
+  flex: 1;
+  font-weight: 450;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-date {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.row-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.kebab {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--muted-foreground);
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  opacity: 0;
+}
+
+.row:hover .kebab,
+.kebab:hover {
+  opacity: 1;
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 0.8);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  min-width: 120px;
+  z-index: 20;
+  padding: 4px;
+}
+
+.menu button {
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 7px 10px;
+  font-size: 13px;
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--foreground);
+  font-family: inherit;
+}
+
+.menu button:hover {
+  background: var(--muted);
+}
+
+.menu button.danger {
+  color: var(--destructive);
+}
+
+.title-input {
+  flex: 1;
+  max-width: 420px;
+  border: 1px solid transparent;
+  background: none;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+  font-family: inherit;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.title-input:hover {
+  border-color: var(--border);
+}
+
+.title-input:focus {
+  outline: none;
+  border-color: var(--ring);
+  background: var(--background);
 }
 
 .doclist-item {

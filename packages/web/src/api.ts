@@ -81,6 +81,20 @@ export async function getDoc(id: string): Promise<DocMeta> {
   return toMeta(doc)
 }
 
+export async function renameDoc(id: string, title: string): Promise<DocMeta> {
+  const { doc } = await request(`/api/docs/${id}`, { method: 'PATCH', body: JSON.stringify({ title }) })
+  return toMeta(doc)
+}
+
+export async function deleteDoc(id: string): Promise<void> {
+  await request(`/api/docs/${id}`, { method: 'DELETE' })
+}
+
+export async function shareDoc(id: string, email: string): Promise<{ status: string }> {
+  const { result } = await request(`/api/docs/${id}/share`, { method: 'POST', body: JSON.stringify({ email }) })
+  return result
+}
+
 export interface CliToken {
   id: string
   name: string

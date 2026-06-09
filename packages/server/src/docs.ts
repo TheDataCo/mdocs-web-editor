@@ -1,5 +1,10 @@
+import { createHash, randomBytes } from 'node:crypto'
 import { sql } from './db/index.js'
 import type { Principal } from './auth.js'
+
+function hashShareToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
+}
 
 export interface DocRow {
   id: string
@@ -84,7 +89,7 @@ export async function moveDoc(id: string, workspaceId: string): Promise<DocRow |
   return row
 }
 
-/** Whether the principal may open/edit a doc: workspace membership or a direct share. */
+/** Whether the principal may open (view) a doc: workspace membership or any share. */
 export async function canAccess(principal: Principal, docId: string): Promise<boolean> {
   if (principal.kind === 'service') return true
   const [row] = await sql<{ ok: boolean }[]>`
@@ -96,4 +101,46 @@ export async function canAccess(principal: Principal, docId: string): Promise<bo
     ) as ok
   `
   return row?.ok ?? false
+}
+
+/** Whether the principal may edit (write): workspace member or a non-viewer share. */
+export async function canEdit(principal: Principal, docId: string): Promise<boolean> {
+  if (principal.kind === 'service') return true
+  const [row] = await sql<{ ok: boolean }[]>`
+    select exists(
+      select 1 from docs d where d.id = ${docId} and d.deleted_at is null and (
+        d.workspace_id in (select workspace_id from workspace_members where user_id = ${principal.userId})
+        or d.id in (
+          select doc_id from doc_access where user_id = ${principal.userId} and role in ('owner','editor')
+        )
+      )
+    ) as ok
+  `
+  return row?.ok ?? false
+}
+
+/** Create a share link for a doc. Returns the plaintext token (only the hash is stored). */
+export async function createLink(docId: string, role: 'viewer' | 'editor', createdBy: string): Promise<string> {
+  const token = randomBytes(18).toString('base64url')
+  await sql`
+    insert into link_shares (doc_id, token_hash, role, created_by)
+    values (${docId}, ${hashShareToken(token)}, ${role}, ${createdBy})
+  `
+  return token
+}
+
+/** Redeem a share link: grant the user doc_access at the link's role (never downgrades). */
+export async function redeemLink(docId: string, token: string, userId: string): Promise<boolean> {
+  const [link] = await sql<{ role: string }[]>`
+    select role from link_shares
+    where doc_id = ${docId} and token_hash = ${hashShareToken(token)}
+      and revoked_at is null and (expires_at is null or expires_at > now())
+  `
+  if (!link) return false
+  await sql`
+    insert into doc_access (doc_id, user_id, role) values (${docId}, ${userId}, ${link.role})
+    on conflict (doc_id, user_id) do update set
+      role = case when doc_access.role = 'viewer' then excluded.role else doc_access.role end
+  `
+  return true
 }

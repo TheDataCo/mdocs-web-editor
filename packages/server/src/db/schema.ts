@@ -151,6 +151,7 @@ export const linkShares = pgTable('link_shares', {
     .notNull()
     .references(() => docs.id),
   tokenHash: text('token_hash').notNull().unique(),
+  role: text('role').notNull().default('editor'), // 'viewer' | 'editor'
   createdBy: uuid('created_by').references(() => users.id),
   expiresAt: timestamp('expires_at', { withTimezone: true }),
   revokedAt: timestamp('revoked_at', { withTimezone: true }),

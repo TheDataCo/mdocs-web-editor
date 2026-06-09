@@ -341,6 +341,11 @@ body {
   margin-top: 1.6em;
 }
 
+/* No stacked gap above the first rendered element. */
+.preview-inner > :first-child {
+  margin-top: 0;
+}
+
 .preview-inner pre {
   background: var(--muted);
   padding: 14px 16px;
@@ -565,6 +570,49 @@ body {
 
 .menu button.danger {
   color: var(--destructive);
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.peers {
+  display: flex;
+  align-items: center;
+}
+
+.avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  border: 2px solid var(--background);
+  margin-left: -6px;
+}
+
+.avatar:first-child {
+  margin-left: 0;
+}
+
+.share-wrap {
+  position: relative;
+}
+
+.share-menu {
+  right: 0;
+  top: calc(100% + 4px);
+  min-width: 170px;
 }
 
 .title-input {

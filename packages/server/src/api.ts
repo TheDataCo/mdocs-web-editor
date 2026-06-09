@@ -6,7 +6,18 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { authenticate, issueApiToken, type Principal } from './auth.js'
 import { sql } from './db/index.js'
-import { canAccess, createDoc, getDoc, listDocs, moveDoc, renameDoc, softDeleteDoc } from './docs.js'
+import {
+  canAccess,
+  canEdit,
+  createDoc,
+  createLink,
+  getDoc,
+  listDocs,
+  moveDoc,
+  redeemLink,
+  renameDoc,
+  softDeleteDoc,
+} from './docs.js'
 import {
   createTeamWorkspace,
   ensurePersonalWorkspace,
@@ -107,9 +118,35 @@ export function createApi() {
   })
 
   app.get('/api/docs/:id', async (c) => {
-    const doc = await getDoc(c.req.param('id'))
+    const id = c.req.param('id')
+    // Don't reveal existence/metadata to users without access.
+    if (!(await canAccess(c.get('principal'), id))) {
+      return c.json({ error: { code: 'not_found', message: 'no such doc' } }, 404)
+    }
+    const doc = await getDoc(id)
     if (!doc) return c.json({ error: { code: 'not_found', message: 'no such doc' } }, 404)
-    return c.json({ doc })
+    return c.json({ doc, canEdit: await canEdit(c.get('principal'), doc.id) })
+  })
+
+  // Share links (read-only or editor). Creating one requires edit access.
+  app.post('/api/docs/:id/links', async (c) => {
+    const id = c.req.param('id')
+    const userId = requireUser(c)
+    if (!userId || !(await canEdit(c.get('principal'), id))) {
+      return c.json({ error: { code: 'permission_denied', message: 'need edit access to share' } }, 403)
+    }
+    const body = await c.req.json().catch(() => ({}))
+    const role = body.role === 'viewer' ? 'viewer' : 'editor'
+    return c.json({ token: await createLink(id, role, userId), role }, 201)
+  })
+
+  app.post('/api/docs/:id/links/redeem', async (c) => {
+    const id = c.req.param('id')
+    const userId = requireUser(c)
+    if (!userId) return c.json({ error: { code: 'permission_denied', message: 'sign in' } }, 403)
+    const body = await c.req.json().catch(() => ({}))
+    const ok = await redeemLink(id, typeof body.token === 'string' ? body.token : '', userId)
+    return ok ? c.json({ ok: true }) : c.json({ error: { code: 'not_found', message: 'invalid link' } }, 404)
   })
 
   app.patch('/api/docs/:id', async (c) => {

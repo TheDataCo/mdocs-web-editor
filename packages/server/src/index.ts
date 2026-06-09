@@ -5,7 +5,7 @@ import { WebSocketServer } from 'ws'
 import * as Y from 'yjs'
 import { createApi } from './api.js'
 import { authenticate, type Principal } from './auth.js'
-import { canAccess, docExists } from './docs.js'
+import { canAccess, canEdit, docExists } from './docs.js'
 import { env } from './env.js'
 import { appendUpdate, ensureDoc, loadDocState, saveSnapshot } from './persistence.js'
 
@@ -16,7 +16,7 @@ interface ConnContext {
 const hocuspocus = new Hocuspocus({
   // Authenticate the connection (Clerk JWT, dd_ CLI token, or service token) and
   // authorize access to this specific doc. Returning a value sets the context.
-  async onAuthenticate({ token, documentName }): Promise<ConnContext> {
+  async onAuthenticate({ token, documentName, connectionConfig }): Promise<ConnContext> {
     const principal = await authenticate(token)
     if (!principal) throw new Error('unauthorized')
 
@@ -25,6 +25,8 @@ const hocuspocus = new Hocuspocus({
       // membership or an explicit share). Service token may create docs.
       if (!(await docExists(documentName))) throw new Error('not found')
       if (!(await canAccess(principal, documentName))) throw new Error('forbidden')
+      // Viewer-only shares connect read-only: Hocuspocus drops their doc updates.
+      if (!(await canEdit(principal, documentName))) connectionConfig.readOnly = true
     }
     return { principal }
   },

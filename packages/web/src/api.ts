@@ -83,9 +83,27 @@ export async function createDoc(title: string, workspaceId?: string): Promise<Do
   return toMeta(doc)
 }
 
-export async function getDoc(id: string): Promise<DocMeta> {
-  const { doc } = await request(`/api/docs/${id}`)
-  return toMeta(doc)
+export interface DocDetail extends DocMeta {
+  canEdit: boolean
+}
+
+export async function getDoc(id: string): Promise<DocDetail> {
+  const { doc, canEdit } = await request(`/api/docs/${id}`)
+  return { ...toMeta(doc), canEdit }
+}
+
+export async function createLink(id: string, role: 'viewer' | 'editor'): Promise<string> {
+  const { token } = await request(`/api/docs/${id}/links`, { method: 'POST', body: JSON.stringify({ role }) })
+  return token
+}
+
+export async function redeemLink(id: string, token: string): Promise<boolean> {
+  try {
+    await request(`/api/docs/${id}/links/redeem`, { method: 'POST', body: JSON.stringify({ token }) })
+    return true
+  } catch {
+    return false
+  }
 }
 
 export async function renameDoc(id: string, title: string): Promise<DocMeta> {

@@ -6,7 +6,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { authenticate, issueApiToken, type Principal } from './auth.js'
 import { sql } from './db/index.js'
-import { canAccess, createDoc, getDoc, listDocs, renameDoc, softDeleteDoc } from './docs.js'
+import { canAccess, createDoc, getDoc, listDocs, moveDoc, renameDoc, softDeleteDoc } from './docs.js'
 import {
   createTeamWorkspace,
   ensurePersonalWorkspace,
@@ -114,13 +114,23 @@ export function createApi() {
 
   app.patch('/api/docs/:id', async (c) => {
     const id = c.req.param('id')
-    if (!(await canAccess(c.get('principal'), id))) {
+    const principal = c.get('principal')
+    if (!(await canAccess(principal, id))) {
       return c.json({ error: { code: 'permission_denied', message: 'no access' } }, 403)
     }
     const body = await c.req.json().catch(() => ({}))
-    const title = typeof body.title === 'string' ? body.title.trim() : ''
-    if (!title) return c.json({ error: { code: 'invalid', message: 'title required' } }, 400)
-    const doc = await renameDoc(id, title)
+    let doc
+    if (typeof body.title === 'string' && body.title.trim()) {
+      doc = await renameDoc(id, body.title.trim())
+    }
+    // Move between workspaces (drag-and-drop): require membership of the target.
+    if (typeof body.workspaceId === 'string' && body.workspaceId) {
+      const userId = principal.kind === 'user' ? principal.userId : null
+      if (userId && !(await isMember(userId, body.workspaceId))) {
+        return c.json({ error: { code: 'permission_denied', message: 'not a member of target' } }, 403)
+      }
+      doc = await moveDoc(id, body.workspaceId)
+    }
     if (!doc) return c.json({ error: { code: 'not_found', message: 'no such doc' } }, 404)
     return c.json({ doc })
   })

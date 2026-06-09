@@ -5,12 +5,19 @@ import { API_URL } from './config'
 interface ApiDoc {
   id: string
   title: string
+  workspace_id: string | null
   created_at: string
   updated_at: string
 }
 
 function toMeta(d: ApiDoc): DocMeta {
-  return { id: d.id, title: d.title, createdAt: d.created_at, updatedAt: d.updated_at }
+  return {
+    id: d.id,
+    title: d.title,
+    workspaceId: d.workspace_id ?? null,
+    createdAt: d.created_at,
+    updatedAt: d.updated_at,
+  }
 }
 
 async function request(path: string, init?: RequestInit) {
@@ -83,6 +90,11 @@ export async function getDoc(id: string): Promise<DocMeta> {
 
 export async function renameDoc(id: string, title: string): Promise<DocMeta> {
   const { doc } = await request(`/api/docs/${id}`, { method: 'PATCH', body: JSON.stringify({ title }) })
+  return toMeta(doc)
+}
+
+export async function moveDoc(id: string, workspaceId: string): Promise<DocMeta> {
+  const { doc } = await request(`/api/docs/${id}`, { method: 'PATCH', body: JSON.stringify({ workspaceId }) })
   return toMeta(doc)
 }
 

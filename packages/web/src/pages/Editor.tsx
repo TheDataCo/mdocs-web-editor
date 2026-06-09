@@ -11,6 +11,7 @@ import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next'
 import * as Y from 'yjs'
 import { getDoc, renameDoc, shareDoc } from '../api'
 import { getToken } from '../auth'
+import { DocTree } from '../components/DocTree'
 import { WS_URL } from '../config'
 import { Preview } from './Preview'
 
@@ -38,7 +39,9 @@ export function EditorPage() {
   toggleRef.current = () => setMode(modeRef.current === 'raw' ? 'preview' : 'raw')
 
   useEffect(() => {
-    getDoc(id!).then(setMeta, () => setMeta({ id: id!, title: 'Unknown doc', createdAt: '', updatedAt: '' }))
+    getDoc(id!).then(setMeta, () =>
+      setMeta({ id: id!, title: 'Unknown doc', workspaceId: null, createdAt: '', updatedAt: '' }),
+    )
   }, [id])
 
   // Inline title editing: update local state immediately (optimistic), debounce
@@ -165,37 +168,42 @@ export function EditorPage() {
   }
 
   return (
-    <>
-      <div className="topbar">
-        <Link to="/" className="back" aria-label="Back to documents">
-          ←
-        </Link>
-        <input
-          className="title-input"
-          value={meta?.title ?? ''}
-          placeholder="Untitled"
-          onChange={(e) => onTitleChange(e.target.value)}
-          aria-label="Document title"
-        />
-        <span className="spacer" />
-        <button className="btn" onClick={onShare}>
-          Share
-        </button>
-        <button className="btn" onClick={() => toggleRef.current()} title="Toggle view (Cmd+E)">
-          {mode === 'raw' ? 'Preview' : 'Edit'} <kbd>⌘E</kbd>
-        </button>
-        <span className={`status ${status}`}>{status}</span>
-        <UserButton />
+    <div className="editor-shell">
+      <DocTree activeDocId={id} />
+      <div className="editor-main">
+        <div className="topbar">
+          <Link to="/" className="back" aria-label="Back to documents">
+            ←
+          </Link>
+          <input
+            className="title-input"
+            value={meta?.title ?? ''}
+            placeholder="Untitled"
+            onChange={(e) => onTitleChange(e.target.value)}
+            aria-label="Document title"
+          />
+          <span className="spacer" />
+          <button className="btn" onClick={onShare}>
+            Share
+          </button>
+          <button className="btn" onClick={() => toggleRef.current()} title="Toggle view (Cmd+E)">
+            {mode === 'raw' ? 'Preview' : 'Edit'} <kbd>⌘E</kbd>
+          </button>
+          <span className={`status ${status}`}>{status}</span>
+          <UserButton />
+        </div>
+        <div className="editor-scroll">
+          <div className="editor-wrap" ref={editorRef} style={{ display: mode === 'raw' ? undefined : 'none' }} />
+          <div
+            className="preview-wrap"
+            ref={previewRef}
+            onDoubleClick={onPreviewDoubleClick}
+            style={{ display: mode === 'preview' ? undefined : 'none' }}
+          >
+            <Preview text={text} />
+          </div>
+        </div>
       </div>
-      <div className="editor-wrap" ref={editorRef} style={{ display: mode === 'raw' ? undefined : 'none' }} />
-      <div
-        className="preview-wrap"
-        ref={previewRef}
-        onDoubleClick={onPreviewDoubleClick}
-        style={{ display: mode === 'preview' ? undefined : 'none' }}
-      >
-        <Preview text={text} />
-      </div>
-    </>
+    </div>
   )
 }

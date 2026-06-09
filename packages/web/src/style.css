@@ -128,9 +128,139 @@ body {
   margin-left: 5px;
 }
 
+/* Editor view: full-height tree + main pane */
+.editor-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.editor-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-scroll {
+  flex: 1;
+  overflow-y: auto;
+  background: oklch(0.985 0 0);
+}
+
+/* Left doc tree */
+.tree {
+  width: 260px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background: oklch(0.99 0 0);
+  overflow: hidden;
+}
+
+.tree-head {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tree-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 8px;
+}
+
+.tree-ws {
+  margin-bottom: 6px;
+}
+
+.tree-ws-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.tree-ws-head.drop {
+  background: oklch(0.93 0.03 250);
+  outline: 1px dashed var(--ring);
+}
+
+.tree-twisty {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  width: 16px;
+  padding: 0;
+}
+
+.tree-ws-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-add {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--muted-foreground);
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 4px;
+  opacity: 0;
+}
+
+.tree-ws-head:hover .tree-add {
+  opacity: 1;
+}
+
+.tree-doc {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--foreground);
+  padding: 5px 8px 5px 26px;
+  border-radius: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-doc:hover {
+  background: var(--muted);
+}
+
+.tree-doc.active {
+  background: var(--muted);
+  font-weight: 500;
+}
+
+.tree-doc.dragging {
+  opacity: 0.4;
+}
+
+.tree-empty {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  padding: 4px 8px 4px 26px;
+}
+
 .editor-wrap {
   max-width: 860px;
-  margin: 28px auto;
+  margin: 16px auto;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -148,12 +278,12 @@ body {
 }
 
 .preview-wrap {
-  max-width: 760px;
-  margin: 28px auto;
+  max-width: 820px;
+  margin: 16px auto;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 32px 40px;
+  padding: 28px 40px;
   min-height: 72vh;
   line-height: 1.65;
   font-size: 15px;

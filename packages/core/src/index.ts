@@ -8,6 +8,7 @@ export const DOC_TEXT_FIELD = 'content'
 export interface DocMeta {
   id: string
   title: string
+  workspaceId: string | null
   createdAt: string
   updatedAt: string
 }

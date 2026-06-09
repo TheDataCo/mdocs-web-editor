@@ -125,7 +125,8 @@ export function EditorPage() {
     })
     const updatePeers = () => {
       const seen = new Map<string, Peer>()
-      for (const s of awareness.getStates().values()) {
+      for (const [clientId, s] of awareness.getStates()) {
+        if (clientId === awareness.clientID) continue // skip yourself
         if (s.user) seen.set(`${s.user.name}|${s.user.color}`, s.user as Peer)
       }
       setPeers([...seen.values()])

@@ -5,7 +5,7 @@ import { WebSocketServer } from 'ws'
 import * as Y from 'yjs'
 import { createApi } from './api.js'
 import { authenticate, type Principal } from './auth.js'
-import { canAccess, docExists, joinDoc } from './docs.js'
+import { canAccess, docExists } from './docs.js'
 import { env } from './env.js'
 import { appendUpdate, ensureDoc, loadDocState, saveSnapshot } from './persistence.js'
 
@@ -21,12 +21,10 @@ const hocuspocus = new Hocuspocus({
     if (!principal) throw new Error('unauthorized')
 
     if (principal.kind === 'user') {
-      // Service token may create docs implicitly; real users may only open
-      // existing docs — and opening one auto-joins them (anyone-with-the-link).
+      // Real users may only open existing docs they can access (workspace
+      // membership or an explicit share). Service token may create docs.
       if (!(await docExists(documentName))) throw new Error('not found')
-      if (!(await canAccess(principal, documentName))) {
-        await joinDoc(principal.userId, documentName)
-      }
+      if (!(await canAccess(principal, documentName))) throw new Error('forbidden')
     }
     return { principal }
   },

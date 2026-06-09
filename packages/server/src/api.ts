@@ -6,7 +6,16 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { authenticate, issueApiToken, type Principal } from './auth.js'
 import { sql } from './db/index.js'
-import { createDoc, getDoc, joinDoc, listDocs } from './docs.js'
+import { createDoc, getDoc, listDocs } from './docs.js'
+import {
+  createTeamWorkspace,
+  ensurePersonalWorkspace,
+  inviteToWorkspace,
+  isMember,
+  listMembers,
+  listWorkspaces,
+  memberRole,
+} from './workspaces.js'
 
 // The web build, when present (prod), is served from this same origin so the
 // SPA, API, and websocket share a host — no CORS, URLs derived from location.
@@ -37,8 +46,48 @@ export function createApi() {
     return p.kind === 'user' ? p.userId : null
   }
 
+  // Workspaces
+  app.get('/api/workspaces', async (c) => {
+    const userId = requireUser(c)
+    if (!userId) return c.json({ workspaces: [] })
+    await ensurePersonalWorkspace(userId)
+    return c.json({ workspaces: await listWorkspaces(userId) })
+  })
+
+  app.post('/api/workspaces', async (c) => {
+    const userId = requireUser(c)
+    if (!userId) return c.json({ error: { code: 'permission_denied', message: 'sign in' } }, 403)
+    const body = await c.req.json().catch(() => ({}))
+    const name = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : 'Team'
+    return c.json({ workspace: await createTeamWorkspace(userId, name) }, 201)
+  })
+
+  app.get('/api/workspaces/:id/members', async (c) => {
+    const userId = requireUser(c)
+    if (!userId || !(await isMember(userId, c.req.param('id')))) {
+      return c.json({ error: { code: 'permission_denied', message: 'not a member' } }, 403)
+    }
+    return c.json({ members: await listMembers(c.req.param('id')) })
+  })
+
+  app.post('/api/workspaces/:id/invitations', async (c) => {
+    const userId = requireUser(c)
+    const wsId = c.req.param('id')
+    const role = await (userId ? memberRole(userId, wsId) : null)
+    if (!userId || (role !== 'owner' && role !== 'admin')) {
+      return c.json({ error: { code: 'permission_denied', message: 'admins only' } }, 403)
+    }
+    const body = await c.req.json().catch(() => ({}))
+    const email = typeof body.email === 'string' ? body.email.trim() : ''
+    if (!email) return c.json({ error: { code: 'invalid', message: 'email required' } }, 400)
+    const inviteRole = body.role === 'admin' ? 'admin' : 'member'
+    return c.json({ result: await inviteToWorkspace(wsId, email, inviteRole, userId) }, 201)
+  })
+
+  // Docs
   app.get('/api/docs', async (c) => {
-    return c.json({ docs: await listDocs(c.get('principal')) })
+    const ws = c.req.query('workspace') || undefined
+    return c.json({ docs: await listDocs(c.get('principal'), ws) })
   })
 
   app.post('/api/docs', async (c) => {
@@ -46,7 +95,15 @@ export function createApi() {
     if (!userId) return c.json({ error: { code: 'permission_denied', message: 'sign in to create docs' } }, 403)
     const body = await c.req.json().catch(() => ({}))
     const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim() : 'Untitled'
-    return c.json({ doc: await createDoc(title, userId) }, 201)
+    // Default to the user's personal workspace; otherwise require membership.
+    const workspaceId =
+      typeof body.workspaceId === 'string' && body.workspaceId
+        ? body.workspaceId
+        : await ensurePersonalWorkspace(userId)
+    if (!(await isMember(userId, workspaceId))) {
+      return c.json({ error: { code: 'permission_denied', message: 'not a workspace member' } }, 403)
+    }
+    return c.json({ doc: await createDoc(title, workspaceId, userId) }, 201)
   })
 
   app.get('/api/docs/:id', async (c) => {
@@ -90,5 +147,3 @@ export function createApi() {
 
   return app
 }
-
-export { joinDoc }

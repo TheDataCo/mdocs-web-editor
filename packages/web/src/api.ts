@@ -26,13 +26,53 @@ async function request(path: string, init?: RequestInit) {
   return res.json()
 }
 
-export async function listDocs(): Promise<DocMeta[]> {
-  const { docs } = await request('/api/docs')
+export interface Workspace {
+  id: string
+  type: 'personal' | 'team'
+  name: string
+  role: string
+}
+
+export interface Member {
+  user_id: string
+  email: string
+  name: string | null
+  role: string
+}
+
+export async function listWorkspaces(): Promise<Workspace[]> {
+  const { workspaces } = await request('/api/workspaces')
+  return workspaces
+}
+
+export async function createWorkspace(name: string): Promise<Workspace> {
+  const { workspace } = await request('/api/workspaces', { method: 'POST', body: JSON.stringify({ name }) })
+  return workspace
+}
+
+export async function listMembers(workspaceId: string): Promise<Member[]> {
+  const { members } = await request(`/api/workspaces/${workspaceId}/members`)
+  return members
+}
+
+export async function inviteMember(workspaceId: string, email: string, role = 'member'): Promise<{ status: string }> {
+  const { result } = await request(`/api/workspaces/${workspaceId}/invitations`, {
+    method: 'POST',
+    body: JSON.stringify({ email, role }),
+  })
+  return result
+}
+
+export async function listDocs(workspaceId?: string): Promise<DocMeta[]> {
+  const { docs } = await request(`/api/docs${workspaceId ? `?workspace=${workspaceId}` : ''}`)
   return docs.map(toMeta)
 }
 
-export async function createDoc(title: string): Promise<DocMeta> {
-  const { doc } = await request('/api/docs', { method: 'POST', body: JSON.stringify({ title }) })
+export async function createDoc(title: string, workspaceId?: string): Promise<DocMeta> {
+  const { doc } = await request('/api/docs', {
+    method: 'POST',
+    body: JSON.stringify({ title, workspaceId }),
+  })
   return toMeta(doc)
 }
 

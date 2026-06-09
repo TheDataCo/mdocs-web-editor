@@ -2,6 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { createClerkClient, verifyToken } from '@clerk/backend'
 import { sql } from './db/index.js'
 import { env } from './env.js'
+import { claimInvitations, ensurePersonalWorkspace } from './workspaces.js'
 
 // A principal is whoever is behind a request/connection.
 // - 'user'    → a real person (Clerk browser session) or CLI token, with our users.id
@@ -39,6 +40,10 @@ async function userFromClerk(clerkId: string): Promise<string> {
   const [existing] = await sql<{ id: string }[]>`select id from users where clerk_id = ${clerkId}`
   if (existing) {
     userIdCache.set(clerkId, existing.id)
+    // First auth this process: make sure their personal workspace + any pending
+    // invitations are resolved (cheap; runs once per user per process).
+    await ensurePersonalWorkspace(existing.id)
+    await claimInvitations(existing.id)
     return existing.id
   }
 
@@ -54,6 +59,8 @@ async function userFromClerk(clerkId: string): Promise<string> {
     returning id
   `
   userIdCache.set(clerkId, created!.id)
+  await ensurePersonalWorkspace(created!.id)
+  await claimInvitations(created!.id)
   return created!.id
 }
 

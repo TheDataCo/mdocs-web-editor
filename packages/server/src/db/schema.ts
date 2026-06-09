@@ -34,15 +34,67 @@ export const apiTokens = pgTable('api_tokens', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
-export const docs = pgTable('docs', {
+// A workspace is the home for docs. 'personal' = one per user (single member);
+// 'team' = our own multi-member workspace (membership/roles/invites below).
+export const workspaces = pgTable('workspaces', {
   id: uuid('id').primaryKey().defaultRandom(),
-  title: text('title').notNull(),
-  // Nullable until auth lands (milestone 3); docs created before then are unowned.
-  ownerId: uuid('owner_id').references(() => users.id),
+  type: text('type').notNull(), // 'personal' | 'team'
+  name: text('name').notNull(),
+  ownerId: uuid('owner_id')
+    .notNull()
+    .references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  deletedAt: timestamp('deleted_at', { withTimezone: true }),
 })
+
+export const workspaceMembers = pgTable(
+  'workspace_members',
+  {
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    role: text('role').notNull(), // 'owner' | 'admin' | 'member'
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.userId] })],
+)
+
+// Invite by email; claimed on the invitee's next login (no email-send dependency).
+export const workspaceInvitations = pgTable(
+  'workspace_invitations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id),
+    email: text('email').notNull(),
+    role: text('role').notNull(), // 'admin' | 'member'
+    invitedBy: uuid('invited_by').references(() => users.id),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('workspace_invitations_email_idx').on(t.email)],
+)
+
+export const docs = pgTable(
+  'docs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    title: text('title').notNull(),
+    // Home workspace. Nullable only to ease migration of pre-workspace rows; the
+    // app always sets it on create.
+    workspaceId: uuid('workspace_id').references(() => workspaces.id),
+    // The doc's creator (column kept as owner_id from the pre-workspace schema).
+    ownerId: uuid('owner_id').references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (t) => [index('docs_workspace_idx').on(t.workspaceId)],
+)
 
 // Append-only Yjs update log: the sync/audit substrate. Compaction snapshots
 // never delete rows here (retention is a separate, explicit policy decision).

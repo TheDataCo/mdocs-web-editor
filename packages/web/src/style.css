@@ -612,7 +612,58 @@ body {
 .share-menu {
   right: 0;
   top: calc(100% + 4px);
-  min-width: 170px;
+  min-width: 190px;
+}
+
+.share-invite {
+  padding: 2px 4px 4px;
+}
+
+.share-invite input,
+.invite-row input,
+.ws-rename,
+.row-rename {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 0.7);
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.share-invite input:focus,
+.invite-row input:focus,
+.ws-rename:focus,
+.row-rename:focus {
+  outline: none;
+  border-color: var(--ring);
+}
+
+.share-msg {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  padding: 2px 8px 6px;
+}
+
+.invite-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.invite-row input {
+  max-width: 280px;
+}
+
+.ws-rename {
+  margin: 1px 0;
+}
+
+.row-rename {
+  font-size: 14px;
 }
 
 .title-input {

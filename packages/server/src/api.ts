@@ -26,6 +26,7 @@ import {
   listMembers,
   listWorkspaces,
   memberRole,
+  renameWorkspace,
 } from './workspaces.js'
 
 // The web build, when present (prod), is served from this same origin so the
@@ -71,6 +72,20 @@ export function createApi() {
     const body = await c.req.json().catch(() => ({}))
     const name = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : 'Team'
     return c.json({ workspace: await createTeamWorkspace(userId, name) }, 201)
+  })
+
+  app.patch('/api/workspaces/:id', async (c) => {
+    const userId = requireUser(c)
+    const wsId = c.req.param('id')
+    const role = await (userId ? memberRole(userId, wsId) : null)
+    if (!userId || (role !== 'owner' && role !== 'admin')) {
+      return c.json({ error: { code: 'permission_denied', message: 'admins only' } }, 403)
+    }
+    const body = await c.req.json().catch(() => ({}))
+    const name = typeof body.name === 'string' ? body.name.trim() : ''
+    if (!name) return c.json({ error: { code: 'invalid', message: 'name required' } }, 400)
+    await renameWorkspace(wsId, name)
+    return c.json({ ok: true })
   })
 
   app.get('/api/workspaces/:id/members', async (c) => {

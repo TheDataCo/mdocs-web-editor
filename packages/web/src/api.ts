@@ -57,6 +57,10 @@ export async function createWorkspace(name: string): Promise<Workspace> {
   return workspace
 }
 
+export async function renameWorkspace(id: string, name: string): Promise<void> {
+  await request(`/api/workspaces/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
+}
+
 export async function listMembers(workspaceId: string): Promise<Member[]> {
   const { members } = await request(`/api/workspaces/${workspaceId}/members`)
   return members

@@ -1,6 +1,6 @@
 import { UserButton } from '@clerk/clerk-react'
 import type { DocMeta } from '@datadocs/core'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   createDoc,
@@ -11,21 +11,16 @@ import {
   listDocs,
   listWorkspaces,
   renameDoc,
+  renameWorkspace,
   type Workspace,
 } from '../api'
 import { Wordmark } from '../components/Wordmark'
 
-// "Untitled", then "Untitled 2", "Untitled 3", … based on existing titles.
 function nextUntitled(docs: DocMeta[]): string {
   const nums = docs
-    .map((d) => {
-      if (d.title === 'Untitled') return 1
-      const m = d.title.match(/^Untitled (\d+)$/)
-      return m ? Number(m[1]) : 0
-    })
+    .map((d) => (d.title === 'Untitled' ? 1 : Number(d.title.match(/^Untitled (\d+)$/)?.[1] ?? 0)))
     .filter((n) => n > 0)
-  if (nums.length === 0) return 'Untitled'
-  return `Untitled ${Math.max(...nums) + 1}`
+  return nums.length ? `Untitled ${Math.max(...nums) + 1}` : 'Untitled'
 }
 
 export function DocListPage() {
@@ -34,6 +29,12 @@ export function DocListPage() {
   const [docs, setDocs] = useState<DocMeta[] | null>(null)
   const [query, setQuery] = useState('')
   const [menuFor, setMenuFor] = useState<string | null>(null)
+  const [renamingDoc, setRenamingDoc] = useState<string | null>(null)
+  const [renamingWs, setRenamingWs] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [tokenCopied, setTokenCopied] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteMsg, setInviteMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
 
@@ -57,7 +58,10 @@ export function DocListPage() {
   }, [activeId])
 
   useEffect(() => {
-    const close = () => setMenuFor(null)
+    const close = () => {
+      setMenuFor(null)
+      setConfirmDelete(null)
+    }
     window.addEventListener('click', close)
     return () => window.removeEventListener('click', close)
   }, [])
@@ -69,39 +73,40 @@ export function DocListPage() {
   }
 
   async function onNewWorkspace() {
-    const name = window.prompt('Team workspace name', 'My Team')
-    if (name === null) return
-    const ws = await createWorkspace(name)
+    const ws = await createWorkspace('Untitled')
     setWorkspaces((cur) => [...cur, ws])
     setActiveId(ws.id)
+    setRenamingWs(ws.id) // drop straight into inline name editing
   }
 
-  async function onInvite() {
-    if (!active || active.type !== 'team') return
-    const email = window.prompt(`Invite someone to ${active.name} (email)`)
-    if (!email) return
-    const { status } = await inviteMember(active.id, email)
-    window.alert(status === 'added' ? `${email} added to ${active.name}` : `Invitation queued for ${email}`)
+  function commitWsRename(ws: Workspace, name: string) {
+    setRenamingWs(null)
+    const next = name.trim()
+    if (!next || next === ws.name) return
+    setWorkspaces((cur) => cur.map((w) => (w.id === ws.id ? { ...w, name: next } : w)))
+    renameWorkspace(ws.id, next).catch(() => listWorkspaces().then(setWorkspaces))
   }
 
-  async function onRename(doc: DocMeta) {
-    const title = window.prompt('Rename document', doc.title)
-    if (!title || title === doc.title) return
-    setDocs((cur) => cur?.map((d) => (d.id === doc.id ? { ...d, title } : d)) ?? null) // optimistic
-    renameDoc(doc.id, title).catch(() => listDocs(activeId!).then(setDocs)) // revert from server on failure
+  function commitDocRename(doc: DocMeta, title: string) {
+    setRenamingDoc(null)
+    const next = title.trim()
+    if (!next || next === doc.title) return
+    setDocs((cur) => cur?.map((d) => (d.id === doc.id ? { ...d, title: next } : d)) ?? null)
+    renameDoc(doc.id, next).catch(() => listDocs(activeId!).then(setDocs))
   }
 
-  async function onDelete(doc: DocMeta) {
-    if (!window.confirm(`Delete "${doc.title}"?`)) return
-    setDocs((cur) => cur?.filter((d) => d.id !== doc.id) ?? null) // optimistic
+  function onDelete(doc: DocMeta) {
+    setMenuFor(null)
+    setConfirmDelete(null)
+    setDocs((cur) => cur?.filter((d) => d.id !== doc.id) ?? null)
     deleteDoc(doc.id).catch(() => listDocs(activeId!).then(setDocs))
   }
 
   async function onCreateToken() {
-    const name = window.prompt('Name this CLI token', 'My laptop')
-    if (name === null) return
-    const { token } = await createToken(name)
-    window.prompt('Copy your token now (shown once):', token)
+    const { token } = await createToken('CLI token')
+    await navigator.clipboard?.writeText(token).catch(() => {})
+    setTokenCopied(true)
+    setTimeout(() => setTokenCopied(false), 1800)
   }
 
   return (
@@ -109,24 +114,40 @@ export function DocListPage() {
       <div className="topbar">
         <Wordmark />
         <span className="spacer" />
-        <button className="btn" onClick={onCreateToken} title="Generate a token for the CLI">
-          CLI token
+        <button className="btn" onClick={onCreateToken} title="Generate a token for the CLI (copied to clipboard)">
+          {tokenCopied ? 'Token copied ✓' : 'CLI token'}
         </button>
         <UserButton />
       </div>
       <div className="layout">
         <aside className="sidebar">
           <div className="sidebar-label">Workspaces</div>
-          {workspaces.map((w) => (
-            <button
-              key={w.id}
-              className={`ws-item ${w.id === activeId ? 'active' : ''}`}
-              onClick={() => setActiveId(w.id)}
-            >
-              <span className="ws-glyph">{w.type === 'personal' ? '•' : '⬡'}</span>
-              {w.name}
-            </button>
-          ))}
+          {workspaces.map((w) =>
+            renamingWs === w.id ? (
+              <input
+                key={w.id}
+                className="ws-rename"
+                autoFocus
+                defaultValue={w.name}
+                onBlur={(e) => commitWsRename(w, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur()
+                  if (e.key === 'Escape') setRenamingWs(null)
+                }}
+              />
+            ) : (
+              <button
+                key={w.id}
+                className={`ws-item ${w.id === activeId ? 'active' : ''}`}
+                onClick={() => setActiveId(w.id)}
+                onDoubleClick={() => setRenamingWs(w.id)}
+                title="Double-click to rename"
+              >
+                <span className="ws-glyph">{w.type === 'personal' ? '•' : '⬡'}</span>
+                {w.name}
+              </button>
+            ),
+          )}
           <button className="ws-item new" onClick={onNewWorkspace}>
             + New workspace
           </button>
@@ -138,7 +159,7 @@ export function DocListPage() {
             <h2>{active?.name ?? 'Documents'}</h2>
             <div className="content-actions">
               {active?.type === 'team' && (
-                <button className="btn" onClick={onInvite}>
+                <button className="btn" onClick={() => { setInviteOpen((o) => !o); setInviteMsg(null) }}>
                   Invite
                 </button>
               )}
@@ -147,6 +168,25 @@ export function DocListPage() {
               </button>
             </div>
           </div>
+
+          {inviteOpen && active?.type === 'team' && (
+            <form
+              className="invite-row"
+              onSubmit={async (e) => {
+                e.preventDefault()
+                const input = e.currentTarget.elements.namedItem('email') as HTMLInputElement
+                const email = input.value.trim()
+                if (!email) return
+                const { status } = await inviteMember(active.id, email)
+                setInviteMsg(status === 'added' ? `Added ${email}` : `Invited ${email}`)
+                input.value = ''
+              }}
+            >
+              <input name="email" type="email" placeholder="Invite by email…" autoFocus />
+              <button className="btn" type="submit">Add</button>
+              {inviteMsg && <span className="muted">{inviteMsg}</span>}
+            </form>
+          )}
 
           <input
             className="search"
@@ -161,29 +201,60 @@ export function DocListPage() {
             {docs && filtered.length === 0 && (
               <p className="muted">{query ? 'No matches.' : 'No documents yet — create one.'}</p>
             )}
-            {filtered.map((d) => (
-              <div key={d.id} className="row" onClick={() => navigate(`/d/${d.id}`)}>
-                <span className="doclist-title">{d.title}</span>
-                <span className="muted row-date">{new Date(d.updatedAt).toLocaleDateString()}</span>
-                <div className="row-menu" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    className="kebab"
-                    onClick={() => setMenuFor(menuFor === d.id ? null : d.id)}
-                    aria-label="Document options"
-                  >
-                    ⋯
-                  </button>
-                  {menuFor === d.id && (
-                    <div className="menu">
-                      <button onClick={() => onRename(d)}>Rename</button>
-                      <button className="danger" onClick={() => onDelete(d)}>
-                        Delete
-                      </button>
-                    </div>
-                  )}
+            {filtered.map((d) =>
+              renamingDoc === d.id ? (
+                <div key={d.id} className="row">
+                  <input
+                    className="row-rename"
+                    autoFocus
+                    defaultValue={d.title}
+                    onBlur={(e) => commitDocRename(d, e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') e.currentTarget.blur()
+                      if (e.key === 'Escape') setRenamingDoc(null)
+                    }}
+                  />
                 </div>
-              </div>
-            ))}
+              ) : (
+                <div key={d.id} className="row" onClick={() => navigate(`/d/${d.id}`)}>
+                  <span className="doclist-title">{d.title}</span>
+                  <span className="muted row-date">{new Date(d.updatedAt).toLocaleDateString()}</span>
+                  <div className="row-menu" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      className="kebab"
+                      onClick={() => {
+                        setMenuFor(menuFor === d.id ? null : d.id)
+                        setConfirmDelete(null)
+                      }}
+                      aria-label="Document options"
+                    >
+                      ⋯
+                    </button>
+                    {menuFor === d.id && (
+                      <div className="menu">
+                        <button
+                          onClick={() => {
+                            setMenuFor(null)
+                            setRenamingDoc(d.id)
+                          }}
+                        >
+                          Rename
+                        </button>
+                        {confirmDelete === d.id ? (
+                          <button className="danger" onClick={() => onDelete(d)}>
+                            Confirm delete
+                          </button>
+                        ) : (
+                          <button className="danger" onClick={() => setConfirmDelete(d.id)}>
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ),
+            )}
           </div>
         </main>
       </div>

@@ -68,6 +68,10 @@ export async function createTeamWorkspace(userId: string, name: string): Promise
   })
 }
 
+export async function renameWorkspace(workspaceId: string, name: string): Promise<void> {
+  await sql`update workspaces set name = ${name}, updated_at = now() where id = ${workspaceId}`
+}
+
 export async function isMember(userId: string, workspaceId: string): Promise<boolean> {
   const [row] = await sql<{ exists: boolean }[]>`
     select exists(

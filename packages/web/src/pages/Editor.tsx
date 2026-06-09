@@ -35,6 +35,8 @@ export function EditorPage() {
   const [text, setText] = useState('')
   const [peers, setPeers] = useState<Peer[]>([])
   const [shareOpen, setShareOpen] = useState(false)
+  const [copied, setCopied] = useState<'viewer' | 'editor' | null>(null)
+  const [inviteMsg, setInviteMsg] = useState<string | null>(null)
   const [mode, setMode] = useState<Mode>(() =>
     localStorage.getItem(`datadocs:view:${id}`) === 'preview' ? 'preview' : 'split',
   )
@@ -82,24 +84,17 @@ export function EditorPage() {
     }, 500)
   }
 
-  async function onInviteEmail() {
-    setShareOpen(false)
-    const email = window.prompt('Share with (email)')
-    if (!email?.trim()) return
+  async function onInviteEmail(email: string) {
+    if (!email.trim()) return
     const { status } = await shareDoc(id!, email.trim())
-    window.alert(
-      status === 'shared'
-        ? `Shared with ${email}`
-        : `No mdocs account for ${email} yet — they can sign in, then you can share.`,
-    )
+    setInviteMsg(status === 'shared' ? `Shared with ${email}` : `No mdocs account for ${email} yet`)
   }
 
   async function onCopyLink(role: 'viewer' | 'editor') {
-    setShareOpen(false)
     const token = await createLink(id!, role)
-    const url = `${window.location.origin}/d/${id}?share=${token}`
-    await navigator.clipboard?.writeText(url).catch(() => {})
-    window.alert(`${role === 'viewer' ? 'Read-only' : 'Edit'} link copied to clipboard.`)
+    await navigator.clipboard?.writeText(`${window.location.origin}/d/${id}?share=${token}`).catch(() => {})
+    setCopied(role)
+    setTimeout(() => setCopied((c) => (c === role ? null : c)), 1800)
   }
 
   // Build the collaborative editor once access is known (read-only for viewers).
@@ -233,9 +228,24 @@ export function EditorPage() {
               </button>
               {shareOpen && (
                 <div className="menu share-menu">
-                  <button onClick={onInviteEmail}>Invite by email…</button>
-                  <button onClick={() => onCopyLink('editor')}>Copy edit link</button>
-                  <button onClick={() => onCopyLink('viewer')}>Copy read-only link</button>
+                  <form
+                    className="share-invite"
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      const input = e.currentTarget.elements.namedItem('email') as HTMLInputElement
+                      onInviteEmail(input.value)
+                      input.value = ''
+                    }}
+                  >
+                    <input name="email" type="email" placeholder="Invite by email…" />
+                  </form>
+                  {inviteMsg && <div className="share-msg">{inviteMsg}</div>}
+                  <button onClick={() => onCopyLink('editor')}>
+                    {copied === 'editor' ? 'Copied ✓' : 'Copy edit link'}
+                  </button>
+                  <button onClick={() => onCopyLink('viewer')}>
+                    {copied === 'viewer' ? 'Copied ✓' : 'Copy read-only link'}
+                  </button>
                 </div>
               )}
             </div>

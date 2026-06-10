@@ -14,6 +14,10 @@ export interface Version {
   createdAt: string
 }
 
+export interface VersionWithAuthor extends Version {
+  authorEmail: string | null
+}
+
 export function hashContent(text: string): string {
   return createHash('sha256').update(text).digest('hex')
 }
@@ -98,10 +102,13 @@ export async function createVersion(
   })
 }
 
-export async function listVersions(docId: string): Promise<Version[]> {
-  return sql<Version[]>`
-    select id, n, content_hash as "contentHash", source, message, author_id as "authorId", created_at as "createdAt"
-    from doc_versions where doc_id = ${docId} and status = 'active' order by n desc
+export async function listVersions(docId: string): Promise<VersionWithAuthor[]> {
+  return sql<VersionWithAuthor[]>`
+    select v.id, v.n, v.content_hash as "contentHash", v.source, v.message,
+           v.author_id as "authorId", u.email as "authorEmail", v.created_at as "createdAt"
+    from doc_versions v
+    left join users u on u.id = v.author_id
+    where v.doc_id = ${docId} and v.status = 'active' order by v.n desc
   `
 }
 

@@ -139,6 +139,43 @@ export function createApi(hocuspocus: Hocuspocus) {
     return c.json({ versions: await listVersions(id) })
   })
 
+  // Fetch a specific version's markdown (read-only history view).
+  app.get('/api/docs/:id/versions/:n', async (c) => {
+    const id = c.req.param('id')
+    if (!(await canAccess(c.get('principal'), id))) {
+      return c.json({ error: { code: 'not_found', message: 'no such doc' } }, 404)
+    }
+    const content = await getVersionContent(id, Number(c.req.param('n')))
+    if (content === undefined) return c.json({ error: { code: 'not_found', message: 'no such version' } }, 404)
+    return c.text(content)
+  })
+
+  // Revert: restore a previous version's content as a NEW version (non-destructive;
+  // applied to the live doc). "Publish a new version based on a previous one."
+  app.post('/api/docs/:id/revert', async (c) => {
+    const id = c.req.param('id')
+    const principal = c.get('principal')
+    if (!(await canEdit(principal, id))) {
+      return c.json({ error: { code: 'permission_denied', message: 'no edit access to this doc' } }, 403)
+    }
+    const body = await c.req.json().catch(() => ({}))
+    const n = Number(body.version)
+    const content = await getVersionContent(id, n)
+    if (content === undefined) return c.json({ error: { code: 'not_found', message: 'no such version' } }, 404)
+    const conn = await hocuspocus.openDirectConnection(id, { principal })
+    try {
+      await conn.transact((doc) => {
+        const ytext = doc.getText(DOC_TEXT_FIELD)
+        applyTextEdits(ytext, ytext.toString(), content)
+      })
+    } finally {
+      await conn.disconnect()
+    }
+    const message = typeof body.message === 'string' && body.message.trim() ? body.message.trim() : `revert to v${n}`
+    const version = await createVersion(id, principal, 'cli-revert', content, message)
+    return c.json({ ok: true, version })
+  })
+
   // CLI push: server-side 3-way merge of the client's working text against head,
   // using the pulled base version as the common ancestor. Applies to the LIVE
   // doc (so browsers update instantly) and records a new version with the message.

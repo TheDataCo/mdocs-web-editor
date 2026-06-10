@@ -13,7 +13,7 @@ function nextUntitled(docs: DocMeta[]): string {
 
 // Left navigation tree shown inside the editor: workspaces → docs, collapsible,
 // create-in-place, current-doc highlight, drag a doc onto a workspace to move it.
-export function DocTree({ activeDocId }: { activeDocId?: string }) {
+export function DocTree({ activeDocId, activeTitle }: { activeDocId?: string; activeTitle?: string }) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [docs, setDocs] = useState<DocMeta[]>([])
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
@@ -111,7 +111,7 @@ export function DocTree({ activeDocId }: { activeDocId?: string }) {
                     onDragEnd={() => setDragId(null)}
                     onClick={() => navigate(`/d/${d.id}`)}
                   >
-                    {d.title || 'Untitled'}
+                    {(d.id === activeDocId && activeTitle != null ? activeTitle : d.title) || 'Untitled'}
                   </button>
                 ))}
               {!isCollapsed && wsDocs.length === 0 && <div className="tree-empty">No docs</div>}

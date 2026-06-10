@@ -1,5 +1,7 @@
 import { UserButton } from '@clerk/clerk-react'
+import { indentWithTab } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
+import { indentUnit } from '@codemirror/language'
 import { EditorState } from '@codemirror/state'
 import { keymap } from '@codemirror/view'
 import { HocuspocusProvider } from '@hocuspocus/provider'
@@ -36,6 +38,7 @@ export function EditorPage() {
   const [peers, setPeers] = useState<Peer[]>([])
   const [shareOpen, setShareOpen] = useState(false)
   const [copied, setCopied] = useState<'viewer' | 'editor' | null>(null)
+  const [docCopied, setDocCopied] = useState(false)
   const [inviteMsg, setInviteMsg] = useState<string | null>(null)
   const [mode, setMode] = useState<Mode>(() =>
     localStorage.getItem(`datadocs:view:${id}`) === 'preview' ? 'preview' : 'split',
@@ -153,8 +156,10 @@ export function EditorPage() {
           { key: 'Mod-p', preventDefault: true, run: () => (previewToggleRef.current(), true) },
         ]),
         keymap.of(yUndoManagerKeymap),
+        keymap.of([indentWithTab]), // Tab indents (4 spaces) — enables nested lists
         basicSetup,
         markdown(),
+        indentUnit.of('    '),
         EditorView.lineWrapping,
         EditorState.readOnly.of(!canEdit), // viewers can't type (server enforces too)
         yCollab(ytext, awareness, { undoManager }),
@@ -220,6 +225,12 @@ export function EditorPage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [canEdit])
 
+  async function onCopyDoc() {
+    await navigator.clipboard?.writeText(text).catch(() => {})
+    setDocCopied(true)
+    setTimeout(() => setDocCopied(false), 1800)
+  }
+
   function onPreviewDoubleClick(e: React.MouseEvent) {
     const view = viewRef.current
     const el = (e.target as HTMLElement).closest('[data-line]')
@@ -232,7 +243,7 @@ export function EditorPage() {
 
   return (
     <div className="editor-shell">
-      {!treeCollapsed && <DocTree activeDocId={id} />}
+      {!treeCollapsed && <DocTree activeDocId={id} activeTitle={meta?.title} />}
       <div className="editor-main">
         <div className="topbar">
           <button className="icon-btn" onClick={toggleTree} title="Toggle sidebar" aria-label="Toggle sidebar">
@@ -284,6 +295,9 @@ export function EditorPage() {
               )}
             </div>
           )}
+          <button className="btn" onClick={onCopyDoc} title="Copy the full markdown (for pasting into an LLM)">
+            {docCopied ? 'Copied ✓' : 'Copy'}
+          </button>
           <button className="btn" onClick={() => toggleRef.current()} title="Toggle view (Cmd+E)">
             {mode === 'preview' ? 'Edit' : 'Read'} <kbd>⌘E</kbd>
           </button>

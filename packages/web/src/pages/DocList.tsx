@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   createDoc,
-  createToken,
   createWorkspace,
   deleteDoc,
   inviteMember,
@@ -32,19 +31,10 @@ export function DocListPage() {
   const [renamingDoc, setRenamingDoc] = useState<string | null>(null)
   const [renamingWs, setRenamingWs] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
-  const [tokenCopied, setTokenCopied] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteMsg, setInviteMsg] = useState<string | null>(null)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('mdocs:sidebar') === '1')
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
-
-  function toggleSidebar() {
-    setSidebarCollapsed((v) => {
-      localStorage.setItem('mdocs:sidebar', v ? '0' : '1')
-      return !v
-    })
-  }
 
   const active = workspaces.find((w) => w.id === activeId) ?? null
   const filtered = (docs ?? []).filter((d) => d.title.toLowerCase().includes(query.toLowerCase()))
@@ -110,28 +100,14 @@ export function DocListPage() {
     deleteDoc(doc.id).catch(() => listDocs(activeId!).then(setDocs))
   }
 
-  async function onCreateToken() {
-    const { token } = await createToken('CLI token')
-    await navigator.clipboard?.writeText(token).catch(() => {})
-    setTokenCopied(true)
-    setTimeout(() => setTokenCopied(false), 1800)
-  }
-
   return (
     <>
       <div className="topbar">
-        <button className="icon-btn" onClick={toggleSidebar} title="Toggle sidebar" aria-label="Toggle sidebar">
-          ☰
-        </button>
         <Wordmark />
         <span className="spacer" />
-        <button className="btn" onClick={onCreateToken} title="Generate a token for the CLI (copied to clipboard)">
-          {tokenCopied ? 'Token copied ✓' : 'CLI token'}
-        </button>
         <UserButton />
       </div>
       <div className="layout">
-        {!sidebarCollapsed && (
         <aside className="sidebar">
           <div className="sidebar-label">Workspaces</div>
           {workspaces.map((w) =>
@@ -164,7 +140,6 @@ export function DocListPage() {
             + New workspace
           </button>
         </aside>
-        )}
 
         <main className="content">
           {error && <p className="error">{error}</p>}

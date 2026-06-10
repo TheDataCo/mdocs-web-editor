@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { DOC_TEXT_FIELD } from '@datadocs/core'
+import { DOC_TEXT_FIELD } from '@mdocs/core'
 import type { Principal } from './auth.js'
 import { sql } from './db/index.js'
 import { loadDocState } from './persistence.js'

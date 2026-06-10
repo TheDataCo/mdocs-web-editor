@@ -5,8 +5,8 @@ import { indentUnit } from '@codemirror/language'
 import { EditorState } from '@codemirror/state'
 import { keymap } from '@codemirror/view'
 import { HocuspocusProvider } from '@hocuspocus/provider'
-import type { DocMeta } from '@datadocs/core'
-import { DOC_TEXT_FIELD } from '@datadocs/core'
+import type { DocMeta } from '@mdocs/core'
+import { DOC_TEXT_FIELD } from '@mdocs/core'
 import { basicSetup, EditorView } from 'codemirror'
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
@@ -41,7 +41,7 @@ export function EditorPage() {
   const [docCopied, setDocCopied] = useState(false)
   const [inviteMsg, setInviteMsg] = useState<string | null>(null)
   const [mode, setMode] = useState<Mode>(() =>
-    localStorage.getItem(`datadocs:view:${id}`) === 'preview' ? 'preview' : 'split',
+    localStorage.getItem(`mdocs:view:${id}`) === 'preview' ? 'preview' : 'split',
   )
   const [treeCollapsed, setTreeCollapsed] = useState(() => localStorage.getItem('mdocs:sidebar') === '1')
   const [previewCollapsed, setPreviewCollapsed] = useState(() => localStorage.getItem('mdocs:preview') === '1')
@@ -84,7 +84,7 @@ export function EditorPage() {
         if (cancelled) return
         setMeta(d)
         setCanEdit(d.canEdit)
-        if (!d.canEdit && localStorage.getItem(`datadocs:view:${id}`) !== 'split') setMode('preview')
+        if (!d.canEdit && localStorage.getItem(`mdocs:view:${id}`) !== 'split') setMode('preview')
       } catch {
         if (cancelled) return
         setMeta({ id: id!, title: 'Unknown doc', workspaceId: null, createdAt: '', updatedAt: '' })
@@ -184,7 +184,7 @@ export function EditorPage() {
 
   useEffect(() => {
     modeRef.current = mode
-    localStorage.setItem(`datadocs:view:${id}`, mode)
+    localStorage.setItem(`mdocs:view:${id}`, mode)
     if (mode === 'split') viewRef.current?.focus()
   }, [mode, id])
 

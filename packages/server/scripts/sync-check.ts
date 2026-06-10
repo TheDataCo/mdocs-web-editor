@@ -5,7 +5,7 @@
 // Restart-survival is the same as (3) run after bouncing the server.
 import { HocuspocusProvider } from '@hocuspocus/provider'
 import * as Y from 'yjs'
-import { DOC_TEXT_FIELD } from '@datadocs/core'
+import { DOC_TEXT_FIELD } from '@mdocs/core'
 
 const URL = process.env.SYNC_URL ?? 'ws://localhost:3001'
 const TOKEN = process.env.COLLAB_TOKEN ?? 'dev-token'

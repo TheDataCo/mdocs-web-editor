@@ -1,4 +1,4 @@
-// @datadocs/core — types and logic shared by server, web, and cli.
+// @mdocs/core — types and logic shared by server, web, and cli.
 // The diff→rebase→Yjs-ops pipeline (milestone 4) lives here so cli and web
 // use the exact same merge semantics.
 

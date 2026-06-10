@@ -19,15 +19,15 @@ importers:
       '@clerk/backend':
         specifier: ^3.5.0
         version: 3.5.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@datadocs/core':
-        specifier: workspace:*
-        version: link:../core
       '@hocuspocus/server':
         specifier: ^4.1.0
         version: 4.1.0(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
       '@hono/node-server':
         specifier: ^2.0.4
         version: 2.0.4(hono@4.12.23)
+      '@mdocs/core':
+        specifier: workspace:*
+        version: link:../core
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -86,12 +86,12 @@ importers:
       '@codemirror/view':
         specifier: ^6.43.0
         version: 6.43.0
-      '@datadocs/core':
-        specifier: workspace:*
-        version: link:../core
       '@hocuspocus/provider':
         specifier: ^4.1.0
         version: 4.1.0(y-protocols@1.0.7(yjs@13.6.31))(yjs@13.6.31)
+      '@mdocs/core':
+        specifier: workspace:*
+        version: link:../core
       codemirror:
         specifier: ^6.0.2
         version: 6.0.2

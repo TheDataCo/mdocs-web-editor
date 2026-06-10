@@ -1,4 +1,4 @@
-import type { DocMeta } from '@datadocs/core'
+import type { DocMeta } from '@mdocs/core'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createDoc, listDocs, listWorkspaces, moveDoc, type Workspace } from '../api'

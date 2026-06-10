@@ -1,5 +1,5 @@
 import { UserButton } from '@clerk/clerk-react'
-import type { DocMeta } from '@datadocs/core'
+import type { DocMeta } from '@mdocs/core'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {

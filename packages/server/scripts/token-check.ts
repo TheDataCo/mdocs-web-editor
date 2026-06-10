@@ -2,7 +2,7 @@
 // will use) without needing a browser Clerk session.
 import { HocuspocusProvider } from '@hocuspocus/provider'
 import * as Y from 'yjs'
-import { DOC_TEXT_FIELD } from '@datadocs/core'
+import { DOC_TEXT_FIELD } from '@mdocs/core'
 import { issueApiToken } from '../src/auth.js'
 import { sql } from '../src/db/index.js'
 

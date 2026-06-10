@@ -1,4 +1,4 @@
-import type { DocMeta } from '@datadocs/core'
+import type { DocMeta } from '@mdocs/core'
 import { getToken } from './auth'
 import { API_URL } from './config'
 

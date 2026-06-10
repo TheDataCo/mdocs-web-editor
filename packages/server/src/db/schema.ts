@@ -2,6 +2,7 @@ import {
   bigint,
   customType,
   index,
+  uniqueIndex,
   pgTable,
   primaryKey,
   text,
@@ -156,6 +157,31 @@ export const cliAuthRequests = pgTable('cli_auth_requests', {
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+// Point-in-time snapshots of a doc's markdown. Serve double duty: the merge
+// base for CLI push (3-way: base→working vs base→head) and the history timeline.
+// A version is created at meaningful boundaries (a CLI pull that finds head has
+// drifted, a CLI push, later: web editing-session checkpoints).
+export const docVersions = pgTable(
+  'doc_versions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    docId: uuid('doc_id')
+      .notNull()
+      .references(() => docs.id),
+    n: bigint('n', { mode: 'number' }).notNull(), // per-doc monotonic version number
+    content: text('content').notNull(),
+    contentHash: text('content_hash').notNull(),
+    authorId: uuid('author_id').references(() => users.id),
+    source: text('source').notNull(), // 'cli-pull' | 'cli-push' | 'web'
+    // 'active' = part of the doc's real history; 'proposed' = an agent suggestion
+    // awaiting human accept/reject (reserved; direct push uses 'active').
+    status: text('status').notNull().default('active'),
+    message: text('message'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('doc_versions_doc_n_idx').on(t.docId, t.n)],
+)
 
 export const linkShares = pgTable('link_shares', {
   id: uuid('id').primaryKey().defaultRandom(),

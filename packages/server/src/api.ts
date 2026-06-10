@@ -8,6 +8,7 @@ import { DOC_TEXT_FIELD } from '@datadocs/core'
 import { authenticate, issueApiToken, type Principal } from './auth.js'
 import { approveCliAuth, pollCliAuth, startCliAuth } from './cli-auth.js'
 import { loadDocState } from './persistence.js'
+import { checkpointHead, listVersions } from './versions.js'
 import { sql } from './db/index.js'
 import {
   canAccess,
@@ -112,6 +113,28 @@ export function createApi() {
     const text = ydoc.getText(DOC_TEXT_FIELD).toString()
     ydoc.destroy()
     return c.text(text)
+  })
+
+  // CLI pull: head markdown + the base version to merge a later push against
+  // (checkpoints head as a version only if it drifted from the last one).
+  app.get('/api/docs/:id/pull', async (c) => {
+    const id = c.req.param('id')
+    const principal = c.get('principal')
+    if (!(await canAccess(principal, id))) {
+      return c.json({ error: { code: 'not_found', message: 'no such doc' } }, 404)
+    }
+    const doc = await getDoc(id)
+    if (!doc) return c.json({ error: { code: 'not_found', message: 'no such doc' } }, 404)
+    const { content, version } = await checkpointHead(id, principal, 'cli-pull')
+    return c.json({ doc: { id: doc.id, title: doc.title }, content, version })
+  })
+
+  app.get('/api/docs/:id/versions', async (c) => {
+    const id = c.req.param('id')
+    if (!(await canAccess(c.get('principal'), id))) {
+      return c.json({ error: { code: 'not_found', message: 'no such doc' } }, 404)
+    }
+    return c.json({ versions: await listVersions(id) })
   })
 
   // Workspaces

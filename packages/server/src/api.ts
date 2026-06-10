@@ -4,8 +4,10 @@ import { fileURLToPath } from 'node:url'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { DOC_TEXT_FIELD } from '@datadocs/core'
 import { authenticate, issueApiToken, type Principal } from './auth.js'
 import { approveCliAuth, pollCliAuth, startCliAuth } from './cli-auth.js'
+import { loadDocState } from './persistence.js'
 import { sql } from './db/index.js'
 import {
   canAccess,
@@ -89,6 +91,27 @@ export function createApi() {
     const body = await c.req.json().catch(() => ({}))
     const ok = await approveCliAuth(typeof body.user_code === 'string' ? body.user_code : '', userId)
     return ok ? c.json({ ok: true }) : c.json({ error: { code: 'not_found', message: 'invalid or expired code' } }, 404)
+  })
+
+  app.get('/api/me', async (c) => {
+    const p = c.get('principal')
+    if (p.kind !== 'user') return c.json({ user: null })
+    const [user] = await sql<{ id: string; email: string; name: string | null }[]>`
+      select id, email, name from users where id = ${p.userId}
+    `
+    return c.json({ user })
+  })
+
+  // Current markdown text of a doc (for CLI pull).
+  app.get('/api/docs/:id/content', async (c) => {
+    const id = c.req.param('id')
+    if (!(await canAccess(c.get('principal'), id))) {
+      return c.json({ error: { code: 'not_found', message: 'no such doc' } }, 404)
+    }
+    const ydoc = await loadDocState(id)
+    const text = ydoc.getText(DOC_TEXT_FIELD).toString()
+    ydoc.destroy()
+    return c.text(text)
   })
 
   // Workspaces

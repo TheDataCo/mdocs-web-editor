@@ -63,13 +63,38 @@ export async function checkpointHead(
       from doc_versions where doc_id = ${docId} and status = 'active' order by n desc limit 1
     `
     if (latest && latest.contentHash === hash) return { content, version: latest }
-    const nextN = (latest?.n ?? 0) + 1
+    const nextN = Number(latest?.n ?? 0) + 1
     const [created] = await tx<Version[]>`
       insert into doc_versions (doc_id, n, content, content_hash, author_id, source, status)
       values (${docId}, ${nextN}, ${content}, ${hash}, ${authorId}, ${source}, 'active')
       returning id, n, content_hash as "contentHash", source, message, author_id as "authorId", created_at as "createdAt"
     `
     return { content, version: created! }
+  })
+}
+
+/** Record a new version with explicit content + message (used by CLI push). */
+export async function createVersion(
+  docId: string,
+  principal: Principal,
+  source: string,
+  content: string,
+  message: string | null,
+): Promise<Version> {
+  const hash = hashContent(content)
+  const authorId = principal.kind === 'user' ? principal.userId : null
+  return sql.begin(async (tx) => {
+    await tx`select pg_advisory_xact_lock(hashtextextended(${docId}::text, 1))`
+    const [latest] = await tx<{ n: number }[]>`
+      select n from doc_versions where doc_id = ${docId} order by n desc limit 1
+    `
+    const nextN = Number(latest?.n ?? 0) + 1
+    const [created] = await tx<Version[]>`
+      insert into doc_versions (doc_id, n, content, content_hash, author_id, source, status, message)
+      values (${docId}, ${nextN}, ${content}, ${hash}, ${authorId}, ${source}, 'active', ${message})
+      returning id, n, content_hash as "contentHash", source, message, author_id as "authorId", created_at as "createdAt"
+    `
+    return created!
   })
 }
 

@@ -12,18 +12,21 @@
   },
   "dependencies": {
     "@clerk/backend": "^3.5.0",
-    "@mdocs/core": "workspace:*",
     "@hocuspocus/server": "^4.1.0",
     "@hono/node-server": "^2.0.4",
+    "@mdocs/core": "workspace:*",
+    "diff-match-patch": "^1.0.5",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.23",
+    "node-diff3": "^3.2.1",
     "postgres": "^3.4.9",
     "ws": "^8.21.0",
     "yjs": "^13.6.31"
   },
   "devDependencies": {
     "@hocuspocus/provider": "^4.1.0",
+    "@types/diff-match-patch": "^1.0.36",
     "@types/node": "^25.9.2",
     "@types/ws": "^8.18.1",
     "drizzle-kit": "^0.31.10",

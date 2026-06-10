@@ -59,7 +59,7 @@ const hocuspocus = new Hocuspocus({
 })
 
 // One port: Hono answers HTTP, websocket upgrades go to Hocuspocus.
-const app = createApi()
+const app = createApi(hocuspocus)
 const httpServer = serve({ fetch: app.fetch, port: env.PORT, hostname: '0.0.0.0' }, (info) => {
   console.log(`mdocs server (http + ws) listening on :${info.port}`)
 }) as HttpServer

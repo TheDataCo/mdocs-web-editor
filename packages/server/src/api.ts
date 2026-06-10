@@ -1,14 +1,16 @@
 import { existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type { Hocuspocus } from '@hocuspocus/server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { DOC_TEXT_FIELD } from '@mdocs/core'
 import { authenticate, issueApiToken, type Principal } from './auth.js'
 import { approveCliAuth, pollCliAuth, startCliAuth } from './cli-auth.js'
+import { applyTextEdits, threeWayMerge } from './merge.js'
 import { loadDocState } from './persistence.js'
-import { checkpointHead, listVersions } from './versions.js'
+import { checkpointHead, createVersion, getVersionContent, listVersions } from './versions.js'
 import { sql } from './db/index.js'
 import {
   canAccess,
@@ -39,7 +41,7 @@ const WEB_DIST = resolve(dirname(fileURLToPath(import.meta.url)), '../../web/dis
 
 type Vars = { principal: Principal }
 
-export function createApi() {
+export function createApi(hocuspocus: Hocuspocus) {
   const app = new Hono<{ Variables: Vars }>()
 
   app.use('/api/*', cors())
@@ -135,6 +137,49 @@ export function createApi() {
       return c.json({ error: { code: 'not_found', message: 'no such doc' } }, 404)
     }
     return c.json({ versions: await listVersions(id) })
+  })
+
+  // CLI push: server-side 3-way merge of the client's working text against head,
+  // using the pulled base version as the common ancestor. Applies to the LIVE
+  // doc (so browsers update instantly) and records a new version with the message.
+  app.post('/api/docs/:id/push', async (c) => {
+    const id = c.req.param('id')
+    const principal = c.get('principal')
+    if (!(await canEdit(principal, id))) {
+      return c.json({ error: { code: 'permission_denied', message: 'no edit access to this doc' } }, 403)
+    }
+    const body = await c.req.json().catch(() => ({}))
+    const working = typeof body.content === 'string' ? body.content : ''
+    const baseN = Number(body.baseVersion) || 0
+    const message = typeof body.message === 'string' && body.message.trim() ? body.message.trim() : null
+    const base = (baseN ? await getVersionContent(id, baseN) : '') ?? ''
+
+    let conflict = false
+    let merged = ''
+    const conn = await hocuspocus.openDirectConnection(id, { principal })
+    try {
+      await conn.transact((doc) => {
+        const ytext = doc.getText(DOC_TEXT_FIELD)
+        const theirs = ytext.toString()
+        const result = threeWayMerge(base, working, theirs)
+        if (!result.clean) {
+          conflict = true
+          return
+        }
+        applyTextEdits(ytext, theirs, result.text)
+        merged = result.text
+      })
+    } finally {
+      await conn.disconnect()
+    }
+    if (conflict) {
+      return c.json(
+        { error: { code: 'patch_conflict', message: 'merge conflict with current head; re-pull and retry' } },
+        409,
+      )
+    }
+    const version = await createVersion(id, principal, 'cli-push', merged, message)
+    return c.json({ ok: true, version })
   })
 
   // Workspaces

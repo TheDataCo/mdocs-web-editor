@@ -6,3 +6,7 @@ dist/
 .datadocs/
 *.log
 .DS_Store
+
+# Internal planning docs (kept local, not published)
+PLAN.md
+CLI-PLAN.md

@@ -45,23 +45,48 @@ body {
 /* Wordmark: "mdocs" — Inter, tight tracking, matching The Data Company treatment */
 .wordmark {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 9px;
   text-decoration: none;
   color: var(--foreground);
 }
 
+/* Keycap "m" — a key on a keyboard, matching the favicon. */
+.keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--foreground);
+  color: var(--background);
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
+  box-shadow:
+    0 1.5px 0 rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.wordmark-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
 .wordmark .name {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 
 .wordmark .tagline {
-  font-size: 12px;
+  font-size: 10.5px;
   font-weight: 500;
   color: var(--muted-foreground);
-  letter-spacing: -0.01em;
+  letter-spacing: 0.01em;
 }
 
 @media (max-width: 560px) {

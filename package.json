@@ -1,6 +1,7 @@
 {
   "name": "datadocs",
   "private": true,
+  "license": "AGPL-3.0-only",
   "scripts": {
     "dev:server": "pnpm --filter @datadocs/server dev",
     "dev:web": "pnpm --filter @datadocs/web dev",

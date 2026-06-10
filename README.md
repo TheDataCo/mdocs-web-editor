@@ -75,5 +75,8 @@ The server is a single Node process; all it needs is a `DATABASE_URL` and a
 
 ## License
 
-TBD before first release (AGPL vs Apache-2.0 — tracked in
-[PLAN.md](./PLAN.md#open-questions)).
+**AGPL-3.0-only** (see [LICENSE](./LICENSE)). The app — server, web editor, and
+shared core — is free to self-host; if you run a modified version as a network
+service, the AGPL requires you to publish your changes. The separate
+[`mdocs` CLI](https://github.com/TheDataCo/mdocs) is MIT-licensed for frictionless
+adoption by tools and agents.

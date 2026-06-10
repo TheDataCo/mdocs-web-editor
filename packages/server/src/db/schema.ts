@@ -145,6 +145,18 @@ export const docAccess = pgTable(
   (t) => [primaryKey({ columns: [t.docId, t.userId] })],
 )
 
+// Device-authorization flow for `mdocs auth login`: CLI starts a request, user
+// approves it in the browser, CLI polls for the issued token.
+export const cliAuthRequests = pgTable('cli_auth_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  deviceCode: text('device_code').notNull().unique(), // secret held by the CLI
+  userCode: text('user_code').notNull().unique(), // short code shown to the user
+  approvedBy: uuid('approved_by').references(() => users.id),
+  token: text('token'), // issued dd_ token, delivered once then cleared
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const linkShares = pgTable('link_shares', {
   id: uuid('id').primaryKey().defaultRandom(),
   docId: uuid('doc_id')

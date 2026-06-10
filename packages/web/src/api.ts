@@ -110,6 +110,15 @@ export async function redeemLink(id: string, token: string): Promise<boolean> {
   }
 }
 
+export async function approveCliAuth(userCode: string): Promise<boolean> {
+  try {
+    await request('/api/cli/auth/approve', { method: 'POST', body: JSON.stringify({ user_code: userCode }) })
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function renameDoc(id: string, title: string): Promise<DocMeta> {
   const { doc } = await request(`/api/docs/${id}`, { method: 'PATCH', body: JSON.stringify({ title }) })
   return toMeta(doc)

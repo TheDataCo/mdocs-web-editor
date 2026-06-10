@@ -779,6 +779,30 @@ body {
   color: var(--destructive);
 }
 
+.cli-auth {
+  display: flex;
+  justify-content: center;
+  padding-top: 12vh;
+}
+
+.cli-auth-card {
+  width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.cli-auth-card h2 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
 /* y-codemirror.next remote cursor styles */
 .cm-ySelection {
   opacity: 0.5;

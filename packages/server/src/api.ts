@@ -5,6 +5,7 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { authenticate, issueApiToken, type Principal } from './auth.js'
+import { approveCliAuth, pollCliAuth, startCliAuth } from './cli-auth.js'
 import { sql } from './db/index.js'
 import {
   canAccess,
@@ -43,6 +44,8 @@ export function createApi() {
 
   // Authenticate every /api request to a principal (Clerk JWT, dd_ token, or service token).
   app.use('/api/*', async (c, next) => {
+    // CLI device-auth start/poll are public — the device code is the secret.
+    if (c.req.path === '/api/cli/auth/start' || c.req.path === '/api/cli/auth/poll') return next()
     const header = c.req.header('Authorization')
     const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined
     const principal = await authenticate(token)
@@ -57,6 +60,36 @@ export function createApi() {
     const p = c.get('principal')
     return p.kind === 'user' ? p.userId : null
   }
+
+  // CLI device-authorization flow (`mdocs auth login`)
+  app.post('/api/cli/auth/start', async (c) => {
+    const { deviceCode, userCode, expiresInSec } = await startCliAuth()
+    const host = c.req.header('host') ?? 'mdocs.datacompany.dev'
+    const proto = host.startsWith('localhost') ? 'http' : 'https'
+    const base = `${proto}://${host}`
+    return c.json({
+      device_code: deviceCode,
+      user_code: userCode,
+      verification_uri: `${base}/cli-auth`,
+      verification_uri_complete: `${base}/cli-auth?code=${userCode}`,
+      interval: 2,
+      expires_in: expiresInSec,
+    })
+  })
+
+  app.post('/api/cli/auth/poll', async (c) => {
+    const body = await c.req.json().catch(() => ({}))
+    const result = await pollCliAuth(typeof body.device_code === 'string' ? body.device_code : '')
+    return c.json(result)
+  })
+
+  app.post('/api/cli/auth/approve', async (c) => {
+    const userId = requireUser(c)
+    if (!userId) return c.json({ error: { code: 'permission_denied', message: 'sign in' } }, 403)
+    const body = await c.req.json().catch(() => ({}))
+    const ok = await approveCliAuth(typeof body.user_code === 'string' ? body.user_code : '', userId)
+    return ok ? c.json({ ok: true }) : c.json({ error: { code: 'not_found', message: 'invalid or expired code' } }, 404)
+  })
 
   // Workspaces
   app.get('/api/workspaces', async (c) => {

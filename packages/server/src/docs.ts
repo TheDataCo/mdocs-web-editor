@@ -44,6 +44,29 @@ export async function listDocs(principal: Principal, workspaceId?: string): Prom
   `
 }
 
+export interface SharedDocRow extends DocRow {
+  owner_email: string | null
+  owner_name: string | null
+}
+
+/**
+ * The "Shared" view: docs explicitly shared WITH this user (via doc_access), plus
+ * docs this user owns that they've shared OUT. Includes the owner for display.
+ */
+export async function listSharedDocs(userId: string): Promise<SharedDocRow[]> {
+  return sql<SharedDocRow[]>`
+    select distinct d.id, d.title, d.workspace_id, d.created_at, d.updated_at,
+      ou.email as owner_email, ou.name as owner_name
+    from docs d
+    left join users ou on ou.id = d.owner_id
+    where d.deleted_at is null and (
+      d.id in (select doc_id from doc_access where user_id = ${userId})
+      or (d.owner_id = ${userId} and exists (select 1 from doc_access a where a.doc_id = d.id))
+    )
+    order by d.updated_at desc
+  `
+}
+
 export async function getDoc(id: string): Promise<DocRow | undefined> {
   const [row] = await sql<DocRow[]>`
     select id, title, workspace_id, created_at, updated_at from docs

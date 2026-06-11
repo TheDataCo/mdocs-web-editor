@@ -19,6 +19,7 @@ import {
   createLink,
   getDoc,
   listDocs,
+  listSharedDocs,
   moveDoc,
   redeemLink,
   renameDoc,
@@ -277,6 +278,13 @@ export function createApi(hocuspocus: Hocuspocus) {
     return c.json({ docs: await listDocs(c.get('principal'), ws) })
   })
 
+  // The "Shared" view: docs shared with you + docs you've shared out (with owner).
+  app.get('/api/docs/shared', async (c) => {
+    const userId = requireUser(c)
+    if (!userId) return c.json({ docs: [] })
+    return c.json({ docs: await listSharedDocs(userId) })
+  })
+
   app.post('/api/docs', async (c) => {
     const userId = requireUser(c)
     if (!userId) return c.json({ error: { code: 'permission_denied', message: 'sign in to create docs' } }, 403)
@@ -366,13 +374,14 @@ export function createApi(hocuspocus: Hocuspocus) {
     const body = await c.req.json().catch(() => ({}))
     const email = typeof body.email === 'string' ? body.email.trim() : ''
     if (!email) return c.json({ error: { code: 'invalid', message: 'email required' } }, 400)
+    const role = body.role === 'viewer' ? 'viewer' : 'editor'
     const [user] = await sql<{ id: string }[]>`select id from users where lower(email) = lower(${email})`
     if (!user) return c.json({ result: { status: 'no_account' } })
     await sql`
-      insert into doc_access (doc_id, user_id, role) values (${id}, ${user.id}, 'editor')
-      on conflict (doc_id, user_id) do nothing
+      insert into doc_access (doc_id, user_id, role) values (${id}, ${user.id}, ${role})
+      on conflict (doc_id, user_id) do update set role = excluded.role
     `
-    return c.json({ result: { status: 'shared' } })
+    return c.json({ result: { status: 'shared', role } })
   })
 
   // CLI / API tokens (the "generate a token in the app" flow). Plaintext shown once.

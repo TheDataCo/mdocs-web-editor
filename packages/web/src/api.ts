@@ -79,6 +79,20 @@ export async function listDocs(workspaceId?: string): Promise<DocMeta[]> {
   return docs.map(toMeta)
 }
 
+export interface SharedDoc extends DocMeta {
+  ownerEmail: string | null
+  ownerName: string | null
+}
+
+export async function listShared(): Promise<SharedDoc[]> {
+  const { docs } = await request('/api/docs/shared')
+  return docs.map((d: ApiDoc & { owner_email?: string; owner_name?: string }) => ({
+    ...toMeta(d),
+    ownerEmail: d.owner_email ?? null,
+    ownerName: d.owner_name ?? null,
+  }))
+}
+
 export async function createDoc(title: string, workspaceId?: string): Promise<DocMeta> {
   const { doc } = await request('/api/docs', {
     method: 'POST',

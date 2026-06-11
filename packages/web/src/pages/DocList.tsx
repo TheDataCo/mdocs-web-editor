@@ -8,12 +8,17 @@ import {
   deleteDoc,
   inviteMember,
   listDocs,
+  listShared,
   listWorkspaces,
   renameDoc,
   renameWorkspace,
   type Workspace,
 } from '../api'
 import { Wordmark } from '../components/Wordmark'
+
+// Sentinel "workspace" id for the virtual Shared view.
+const SHARED = '__shared__'
+type Row = DocMeta & { ownerEmail?: string | null; ownerName?: string | null }
 
 function nextUntitled(docs: DocMeta[]): string {
   const nums = docs
@@ -25,7 +30,7 @@ function nextUntitled(docs: DocMeta[]): string {
 export function DocListPage() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
-  const [docs, setDocs] = useState<DocMeta[] | null>(null)
+  const [docs, setDocs] = useState<Row[] | null>(null)
   const [query, setQuery] = useState('')
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [renamingDoc, setRenamingDoc] = useState<string | null>(null)
@@ -36,6 +41,7 @@ export function DocListPage() {
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
 
+  const isShared = activeId === SHARED
   const active = workspaces.find((w) => w.id === activeId) ?? null
   const filtered = (docs ?? []).filter((d) => d.title.toLowerCase().includes(query.toLowerCase()))
 
@@ -52,7 +58,8 @@ export function DocListPage() {
   useEffect(() => {
     if (!activeId) return
     setDocs(null)
-    listDocs(activeId).then(setDocs, (e) => setError(String(e)))
+    const load = activeId === SHARED ? listShared() : listDocs(activeId)
+    load.then(setDocs, (e) => setError(String(e)))
   }, [activeId])
 
   useEffect(() => {
@@ -136,6 +143,14 @@ export function DocListPage() {
               </button>
             ),
           )}
+          <button
+            className={`ws-item ${isShared ? 'active' : ''}`}
+            onClick={() => setActiveId(SHARED)}
+            title="Documents shared with you and ones you've shared"
+          >
+            <span className="ws-glyph">⇄</span>
+            Shared
+          </button>
           <button className="ws-item new" onClick={onNewWorkspace}>
             + New workspace
           </button>
@@ -144,16 +159,18 @@ export function DocListPage() {
         <main className="content">
           {error && <p className="error">{error}</p>}
           <div className="content-head">
-            <h2>{active?.name ?? 'Documents'}</h2>
+            <h2>{isShared ? 'Shared' : (active?.name ?? 'Documents')}</h2>
             <div className="content-actions">
-              {active?.type === 'team' && (
+              {active?.type === 'team' && !isShared && (
                 <button className="btn" onClick={() => { setInviteOpen((o) => !o); setInviteMsg(null) }}>
                   Invite
                 </button>
               )}
-              <button className="btn primary" onClick={onCreate} disabled={!activeId}>
-                New doc
-              </button>
+              {!isShared && (
+                <button className="btn primary" onClick={onCreate} disabled={!activeId}>
+                  New doc
+                </button>
+              )}
             </div>
           </div>
 
@@ -206,40 +223,45 @@ export function DocListPage() {
               ) : (
                 <div key={d.id} className="row" onClick={() => navigate(`/d/${d.id}`)}>
                   <span className="doclist-title">{d.title}</span>
+                  {isShared && (
+                    <span className="muted row-owner">{d.ownerName || d.ownerEmail || '—'}</span>
+                  )}
                   <span className="muted row-date">{new Date(d.updatedAt).toLocaleDateString()}</span>
-                  <div className="row-menu" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      className="kebab"
-                      onClick={() => {
-                        setMenuFor(menuFor === d.id ? null : d.id)
-                        setConfirmDelete(null)
-                      }}
-                      aria-label="Document options"
-                    >
-                      ⋯
-                    </button>
-                    {menuFor === d.id && (
-                      <div className="menu">
-                        <button
-                          onClick={() => {
-                            setMenuFor(null)
-                            setRenamingDoc(d.id)
-                          }}
-                        >
-                          Rename
-                        </button>
-                        {confirmDelete === d.id ? (
-                          <button className="danger" onClick={() => onDelete(d)}>
-                            Confirm delete
+                  {!isShared && (
+                    <div className="row-menu" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className="kebab"
+                        onClick={() => {
+                          setMenuFor(menuFor === d.id ? null : d.id)
+                          setConfirmDelete(null)
+                        }}
+                        aria-label="Document options"
+                      >
+                        ⋯
+                      </button>
+                      {menuFor === d.id && (
+                        <div className="menu">
+                          <button
+                            onClick={() => {
+                              setMenuFor(null)
+                              setRenamingDoc(d.id)
+                            }}
+                          >
+                            Rename
                           </button>
-                        ) : (
-                          <button className="danger" onClick={() => setConfirmDelete(d.id)}>
-                            Delete
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                          {confirmDelete === d.id ? (
+                            <button className="danger" onClick={() => onDelete(d)}>
+                              Confirm delete
+                            </button>
+                          ) : (
+                            <button className="danger" onClick={() => setConfirmDelete(d.id)}>
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ),
             )}

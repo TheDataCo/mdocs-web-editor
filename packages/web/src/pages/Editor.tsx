@@ -301,7 +301,7 @@ export function EditorPage() {
           <button className="btn" onClick={() => toggleRef.current()} title="Toggle view (Cmd+E)">
             {mode === 'preview' ? 'Edit' : 'Read'} <kbd>⌘E</kbd>
           </button>
-          <span className={`status ${status}`}>{status}</span>
+          {status !== 'connected' && <span className={`status ${status}`}>{status}…</span>}
           <UserButton />
         </div>
         <div className={`panes ${mode} ${previewCollapsed ? 'preview-hidden' : ''}`}>

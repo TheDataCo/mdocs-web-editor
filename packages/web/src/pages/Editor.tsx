@@ -1,4 +1,4 @@
-import { UserButton } from '@clerk/clerk-react'
+import { UserButton, useUser } from '@clerk/clerk-react'
 import { indentWithTab } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { indentUnit } from '@codemirror/language'
@@ -16,6 +16,7 @@ import { createLink, getDoc, redeemLink, renameDoc, shareDoc } from '../api'
 import { getToken } from '../auth'
 import { DocTree } from '../components/DocTree'
 import { WS_URL } from '../config'
+import { CommentsPanel } from './Comments'
 import { Preview } from './Preview'
 
 // 'split' = source + live preview side by side (editing); 'preview' = single
@@ -45,6 +46,10 @@ export function EditorPage() {
   )
   const [treeCollapsed, setTreeCollapsed] = useState(() => localStorage.getItem('mdocs:sidebar') === '1')
   const [previewCollapsed, setPreviewCollapsed] = useState(() => localStorage.getItem('mdocs:preview') === '1')
+  const [ydoc, setYdoc] = useState<Y.Doc | null>(null)
+  const [commentsOpen, setCommentsOpen] = useState(false)
+  const { user } = useUser()
+  const displayName = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Someone'
 
   function toggleTree() {
     setTreeCollapsed((v) => {
@@ -131,6 +136,7 @@ export function EditorPage() {
       },
     })
 
+    setYdoc(doc)
     const ytext = doc.getText(DOC_TEXT_FIELD)
     const undoManager = new Y.UndoManager(ytext)
     const awareness = provider.awareness!
@@ -177,6 +183,7 @@ export function EditorPage() {
       ytext.unobserve(syncPreviewText)
       view.destroy()
       viewRef.current = null
+      setYdoc(null)
       provider.destroy()
       doc.destroy()
     }
@@ -298,6 +305,13 @@ export function EditorPage() {
           <button className="btn" onClick={onCopyDoc} title="Copy the full markdown (for pasting into an LLM)">
             {docCopied ? 'Copied ✓' : 'Copy'}
           </button>
+          <button
+            className={`btn ${commentsOpen ? 'primary' : ''}`}
+            onClick={() => setCommentsOpen((o) => !o)}
+            title="Comments"
+          >
+            Comments
+          </button>
           <button className="btn" onClick={() => toggleRef.current()} title="Toggle view (Cmd+E)">
             {mode === 'preview' ? 'Edit' : 'Read'} <kbd>⌘E</kbd>
           </button>
@@ -322,6 +336,14 @@ export function EditorPage() {
           </div>
         </div>
       </div>
+      {commentsOpen && ydoc && (
+        <CommentsPanel
+          doc={ydoc}
+          view={viewRef.current}
+          displayName={displayName}
+          onClose={() => setCommentsOpen(false)}
+        />
+      )}
     </div>
   )
 }

@@ -8,6 +8,7 @@ import { cors } from 'hono/cors'
 import { DOC_TEXT_FIELD } from '@mdocs/core'
 import { authenticate, issueApiToken, type Principal } from './auth.js'
 import { approveCliAuth, pollCliAuth, startCliAuth } from './cli-auth.js'
+import { addCommentToDoc, listComments, newComment, setCommentStatus } from './comments.js'
 import { applyTextEdits, threeWayMerge } from './merge.js'
 import { loadDocState } from './persistence.js'
 import { checkpointHead, createVersion, getVersionContent, listVersions } from './versions.js'
@@ -175,6 +176,41 @@ export function createApi(hocuspocus: Hocuspocus) {
     const message = typeof body.message === 'string' && body.message.trim() ? body.message.trim() : `revert to v${n}`
     const version = await createVersion(id, principal, 'cli-revert', content, message)
     return c.json({ ok: true, version })
+  })
+
+  // Comments (mirrored from the doc's Yjs Y.Map). List over HTTP; add/resolve
+  // write into the live doc so browsers update and the mirror stays in sync.
+  app.get('/api/docs/:id/comments', async (c) => {
+    const id = c.req.param('id')
+    if (!(await canAccess(c.get('principal'), id))) {
+      return c.json({ error: { code: 'not_found', message: 'no such doc' } }, 404)
+    }
+    return c.json({ comments: await listComments(id, c.req.query('status')) })
+  })
+
+  app.post('/api/docs/:id/comments', async (c) => {
+    const id = c.req.param('id')
+    const principal = c.get('principal')
+    if (!(await canAccess(principal, id))) {
+      return c.json({ error: { code: 'permission_denied', message: 'no access' } }, 403)
+    }
+    const body = await c.req.json().catch(() => ({}))
+    const text = typeof body.body === 'string' ? body.body.trim() : ''
+    if (!text) return c.json({ error: { code: 'invalid', message: 'body required' } }, 400)
+    const comment = newComment(principal, text, typeof body.excerpt === 'string' ? body.excerpt : '', body.parentId ?? null)
+    await addCommentToDoc(hocuspocus, id, comment)
+    return c.json({ comment }, 201)
+  })
+
+  app.post('/api/docs/:id/comments/:cid/resolve', async (c) => {
+    const id = c.req.param('id')
+    const principal = c.get('principal')
+    if (!(await canAccess(principal, id))) {
+      return c.json({ error: { code: 'permission_denied', message: 'no access' } }, 403)
+    }
+    const body = await c.req.json().catch(() => ({}))
+    const ok = await setCommentStatus(hocuspocus, id, c.req.param('cid'), body.reopen ? 'open' : 'resolved', principal)
+    return ok ? c.json({ ok: true }) : c.json({ error: { code: 'not_found', message: 'no such comment' } }, 404)
   })
 
   // CLI push: server-side 3-way merge of the client's working text against head,

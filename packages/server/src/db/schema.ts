@@ -183,6 +183,31 @@ export const docVersions = pgTable(
   (t) => [uniqueIndex('doc_versions_doc_n_idx').on(t.docId, t.n)],
 )
 
+// Comments live in the doc's Yjs state (a Y.Map keyed by comment id); the server
+// mirrors them here so the CLI/agents can list and resolve over HTTP.
+export const comments = pgTable(
+  'comments',
+  {
+    id: uuid('id').primaryKey(), // also the Y.Map key
+    docId: uuid('doc_id')
+      .notNull()
+      .references(() => docs.id),
+    authorId: uuid('author_id').references(() => users.id),
+    authorName: text('author_name'),
+    body: text('body').notNull(),
+    // Encoded Yjs RelativePositions (base64) + excerpt fallback for orphaned anchors.
+    anchorStart: text('anchor_start'),
+    anchorEnd: text('anchor_end'),
+    excerpt: text('excerpt'),
+    parentId: uuid('parent_id'),
+    status: text('status').notNull().default('open'), // 'open' | 'resolved'
+    resolvedBy: uuid('resolved_by').references(() => users.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  },
+  (t) => [index('comments_doc_status_idx').on(t.docId, t.status)],
+)
+
 export const linkShares = pgTable('link_shares', {
   id: uuid('id').primaryKey().defaultRandom(),
   docId: uuid('doc_id')

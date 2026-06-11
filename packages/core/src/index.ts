@@ -5,6 +5,26 @@
 /** Name of the Y.Text field holding the markdown body inside each Y.Doc. */
 export const DOC_TEXT_FIELD = 'content'
 
+/** Name of the Y.Map holding comments (keyed by comment id) inside each Y.Doc. */
+export const DOC_COMMENTS_FIELD = 'comments'
+
+/** The shape stored as each value in the comments Y.Map (and mirrored to Postgres). */
+export interface CommentValue {
+  id: string
+  authorId: string | null
+  authorName: string | null
+  body: string
+  // Encoded Yjs RelativePositions (base64); null for a document-level comment.
+  anchorStart: string | null
+  anchorEnd: string | null
+  excerpt: string
+  parentId: string | null
+  status: 'open' | 'resolved'
+  resolvedBy: string | null
+  createdAt: number
+  resolvedAt: number | null
+}
+
 export interface DocMeta {
   id: string
   title: string

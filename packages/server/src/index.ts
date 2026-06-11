@@ -5,6 +5,7 @@ import { WebSocketServer } from 'ws'
 import * as Y from 'yjs'
 import { createApi } from './api.js'
 import { authenticate, type Principal } from './auth.js'
+import { attachCommentMirror } from './comments.js'
 import { canAccess, canEdit, docExists } from './docs.js'
 import { env } from './env.js'
 import { appendUpdate, ensureDoc, loadDocState, saveSnapshot } from './persistence.js'
@@ -39,6 +40,8 @@ const hocuspocus = new Hocuspocus({
     const persisted = await loadDocState(documentName)
     Y.applyUpdate(document, Y.encodeStateAsUpdate(persisted))
     persisted.destroy()
+    // Mirror this doc's comments Y.Map into Postgres for the lifetime of the doc.
+    attachCommentMirror(documentName, document)
     return document
   },
 

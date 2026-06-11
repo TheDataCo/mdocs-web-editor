@@ -148,7 +148,7 @@ export function DocListPage() {
             onClick={() => setActiveId(SHARED)}
             title="Documents shared with you and ones you've shared"
           >
-            <span className="ws-glyph">⇄</span>
+            <span className="ws-glyph">⬡</span>
             Shared
           </button>
           <button className="ws-item new" onClick={onNewWorkspace}>

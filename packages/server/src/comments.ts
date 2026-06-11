@@ -16,10 +16,11 @@ function toTimestamp(ms: number | null): string | null {
 export async function upsert(docId: string, c: CommentValue): Promise<void> {
   await sql`
     insert into comments (id, doc_id, author_id, author_name, body, anchor_start, anchor_end,
-      excerpt, parent_id, status, resolved_by, created_at, resolved_at)
+      excerpt, parent_id, status, created_at_version, resolved_by, created_at, resolved_at)
     values (${c.id}, ${docId}, ${c.authorId}, ${c.authorName}, ${c.body}, ${c.anchorStart},
-      ${c.anchorEnd}, ${c.excerpt}, ${c.parentId}, ${c.status}, ${c.resolvedBy},
-      ${toTimestamp(c.createdAt) ?? sql`now()`}, ${toTimestamp(c.resolvedAt)})
+      ${c.anchorEnd}, ${c.excerpt}, ${c.parentId}, ${c.status},
+      (select coalesce(max(n), 0) from doc_versions where doc_id = ${docId}),
+      ${c.resolvedBy}, ${toTimestamp(c.createdAt) ?? sql`now()`}, ${toTimestamp(c.resolvedAt)})
     on conflict (id) do update set
       body = excluded.body, status = excluded.status, resolved_by = excluded.resolved_by,
       resolved_at = excluded.resolved_at, anchor_start = excluded.anchor_start,
@@ -46,13 +47,13 @@ export async function listComments(docId: string, status?: string) {
   if (status) {
     return sql`
       select id, author_id, author_name, body, anchor_start, anchor_end, excerpt,
-        parent_id, status, created_at, resolved_at
+        parent_id, status, created_at_version, created_at, resolved_at
       from comments where doc_id = ${docId} and status = ${status} order by created_at asc
     `
   }
   return sql`
     select id, author_id, author_name, body, anchor_start, anchor_end, excerpt,
-      parent_id, status, created_at, resolved_at
+      parent_id, status, created_at_version, created_at, resolved_at
     from comments where doc_id = ${docId} order by created_at asc
   `
 }

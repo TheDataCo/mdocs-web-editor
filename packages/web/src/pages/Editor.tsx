@@ -6,7 +6,7 @@ import { EditorState } from '@codemirror/state'
 import { keymap } from '@codemirror/view'
 import { HocuspocusProvider } from '@hocuspocus/provider'
 import type { DocMeta } from '@mdocs/core'
-import { DOC_TEXT_FIELD } from '@mdocs/core'
+import { DOC_COMMENTS_FIELD, DOC_TEXT_FIELD } from '@mdocs/core'
 import { basicSetup, EditorView } from 'codemirror'
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
@@ -16,6 +16,7 @@ import { createLink, getDoc, redeemLink, renameDoc, shareDoc } from '../api'
 import { getToken } from '../auth'
 import { DocTree } from '../components/DocTree'
 import { WS_URL } from '../config'
+import { commentHighlightField, computeCommentMarks, setCommentMarks } from '../lib/commentDecorations'
 import { CommentsPanel } from './Comments'
 import { Preview } from './Preview'
 
@@ -168,6 +169,7 @@ export function EditorPage() {
         indentUnit.of('    '),
         EditorView.lineWrapping,
         EditorState.readOnly.of(!canEdit), // viewers can't type (server enforces too)
+        commentHighlightField,
         yCollab(ytext, awareness, { undoManager }),
       ],
       parent: editorRef.current!,
@@ -178,8 +180,15 @@ export function EditorPage() {
     ytext.observe(syncPreviewText)
     provider.on('synced', syncPreviewText)
 
+    // Recompute comment highlights when comments change (and once after sync).
+    const commentsMap = doc.getMap(DOC_COMMENTS_FIELD)
+    const refreshMarks = () => view.dispatch({ effects: setCommentMarks.of(computeCommentMarks(doc)) })
+    commentsMap.observe(refreshMarks)
+    provider.on('synced', refreshMarks)
+
     return () => {
       awareness.off('change', updatePeers)
+      commentsMap.unobserve(refreshMarks)
       ytext.unobserve(syncPreviewText)
       view.destroy()
       viewRef.current = null
@@ -318,7 +327,7 @@ export function EditorPage() {
           {status !== 'connected' && <span className={`status ${status}`}>{status}…</span>}
           <UserButton />
         </div>
-        <div className={`panes ${mode} ${previewCollapsed ? 'preview-hidden' : ''}`}>
+        <div className={`panes ${mode} ${previewCollapsed || commentsOpen ? 'preview-hidden' : ''}`}>
           <div className="pane pane-editor" ref={editorRef} />
           {mode === 'split' && (
             <div

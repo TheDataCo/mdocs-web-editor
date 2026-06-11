@@ -1,8 +1,10 @@
 import type { DocMeta } from '@mdocs/core'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createDoc, listDocs, listWorkspaces, moveDoc, type Workspace } from '../api'
+import { createDoc, listDocs, listShared, listWorkspaces, moveDoc, type SharedDoc, type Workspace } from '../api'
 import { Wordmark } from './Wordmark'
+
+const SHARED = '__shared__'
 
 function nextUntitled(docs: DocMeta[]): string {
   const nums = docs
@@ -16,6 +18,7 @@ function nextUntitled(docs: DocMeta[]): string {
 export function DocTree({ activeDocId, activeTitle }: { activeDocId?: string; activeTitle?: string }) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [docs, setDocs] = useState<DocMeta[]>([])
+  const [shared, setShared] = useState<SharedDoc[]>([])
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropWs, setDropWs] = useState<string | null>(null)
@@ -26,9 +29,10 @@ export function DocTree({ activeDocId, activeTitle }: { activeDocId?: string; ac
   const matches = (d: DocMeta) => !q || d.title.toLowerCase().includes(q)
 
   const refresh = useCallback(async () => {
-    const [ws, ds] = await Promise.all([listWorkspaces(), listDocs()])
+    const [ws, ds, sh] = await Promise.all([listWorkspaces(), listDocs(), listShared()])
     setWorkspaces(ws)
     setDocs(ds)
+    setShared(sh)
   }, [])
 
   useEffect(() => {
@@ -118,6 +122,37 @@ export function DocTree({ activeDocId, activeTitle }: { activeDocId?: string; ac
             </div>
           )
         })}
+
+        {/* Shared: docs shared with you / shared out. Virtual — no create/rename/delete. */}
+        {(() => {
+          const sharedDocs = shared.filter(matches)
+          if (q && sharedDocs.length === 0) return null
+          const isCollapsed = collapsed.has(SHARED) && !q
+          return (
+            <div className="tree-ws">
+              <div className="tree-ws-head">
+                <button className="tree-twisty" onClick={() => toggle(SHARED)}>
+                  {isCollapsed ? '▸' : '▾'}
+                </button>
+                <span className="tree-ws-name" onClick={() => toggle(SHARED)}>
+                  ⬡ Shared
+                </span>
+              </div>
+              {!isCollapsed &&
+                sharedDocs.map((d) => (
+                  <button
+                    key={d.id}
+                    className={`tree-doc ${d.id === activeDocId ? 'active' : ''}`}
+                    onClick={() => navigate(`/d/${d.id}`)}
+                    title={d.ownerName || d.ownerEmail || undefined}
+                  >
+                    {(d.id === activeDocId && activeTitle != null ? activeTitle : d.title) || 'Untitled'}
+                  </button>
+                ))}
+              {!isCollapsed && sharedDocs.length === 0 && <div className="tree-empty">Nothing shared</div>}
+            </div>
+          )
+        })()}
       </div>
     </aside>
   )

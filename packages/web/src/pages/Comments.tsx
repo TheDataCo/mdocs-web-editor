@@ -2,9 +2,7 @@ import { type CommentValue, DOC_COMMENTS_FIELD, DOC_TEXT_FIELD } from '@mdocs/co
 import type { EditorView } from 'codemirror'
 import { useEffect, useState } from 'react'
 import * as Y from 'yjs'
-
-const enc = (r: Y.RelativePosition) => btoa(String.fromCharCode(...Y.encodeRelativePosition(r)))
-const dec = (s: string) => Y.decodeRelativePosition(Uint8Array.from(atob(s), (c) => c.charCodeAt(0)))
+import { decodeAnchor as dec, encodeAnchor as enc } from '../lib/anchors'
 
 export function CommentsPanel({
   doc,

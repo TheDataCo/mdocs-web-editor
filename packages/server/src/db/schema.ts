@@ -201,6 +201,9 @@ export const comments = pgTable(
     excerpt: text('excerpt'),
     parentId: uuid('parent_id'),
     status: text('status').notNull().default('open'), // 'open' | 'resolved'
+    // The doc version current when the comment was made (audit/context only;
+    // the comment still anchors live in the doc, not pinned to this version).
+    createdAtVersion: bigint('created_at_version', { mode: 'number' }),
     resolvedBy: uuid('resolved_by').references(() => users.id),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),

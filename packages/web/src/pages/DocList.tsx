@@ -6,11 +6,13 @@ import {
   createDoc,
   createWorkspace,
   deleteDoc,
+  getPlan,
   inviteMember,
   listDocs,
   listShared,
   listWorkspaces,
   moveDoc,
+  type PlanInfo,
   renameDoc,
   renameWorkspace,
   type Workspace,
@@ -41,6 +43,7 @@ export function DocListPage() {
   const [inviteMsg, setInviteMsg] = useState<string | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropWs, setDropWs] = useState<string | null>(null)
+  const [plan, setPlan] = useState<PlanInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
 
@@ -67,6 +70,7 @@ export function DocListPage() {
       },
       (e) => setError(String(e)),
     )
+    getPlan().then(setPlan, () => {})
   }, [])
 
   useEffect(() => {
@@ -176,6 +180,17 @@ export function DocListPage() {
           <button className="ws-item new" onClick={onNewWorkspace}>
             + New workspace
           </button>
+          {plan && (
+            <div className="plan-footer" title="Your plan and usage">
+              <span className="plan-name">{plan.planName}</span>
+              <span className="plan-usage">
+                {plan.usage.docs}
+                {plan.entitlements.maxDocs != null ? `/${plan.entitlements.maxDocs}` : ''} docs
+                {plan.entitlements.maxCollaborators != null &&
+                  ` · ${plan.usage.collaborators}/${plan.entitlements.maxCollaborators} shared`}
+              </span>
+            </div>
+          )}
         </aside>
 
         <main className="content">

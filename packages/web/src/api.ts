@@ -105,6 +105,23 @@ export interface DocDetail extends DocMeta {
   canEdit: boolean
 }
 
+export interface PlanInfo {
+  planName: string
+  entitlements: {
+    maxDocs: number | null
+    teamWorkspaces: boolean
+    maxCollaborators: number | null
+    versionHistory: boolean
+    apiCallsPerMonth: number | null
+  }
+  usage: { docs: number; collaborators: number }
+}
+
+export async function getPlan(): Promise<PlanInfo | null> {
+  const res = await request('/api/me/plan')
+  return res.planName ? res : null
+}
+
 export async function getDoc(id: string): Promise<DocDetail> {
   const { doc, canEdit } = await request(`/api/docs/${id}`)
   return { ...toMeta(doc), canEdit }

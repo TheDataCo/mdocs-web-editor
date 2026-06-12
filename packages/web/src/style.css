@@ -493,10 +493,11 @@ body {
 .sidebar {
   width: 220px;
   flex-shrink: 0;
-  padding: 28px 12px;
+  padding: 28px 12px 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-height: calc(100vh - 58px); /* topbar is 57px — lets the plan footer pin to the bottom */
 }
 
 .sidebar-label {
@@ -551,6 +552,28 @@ body {
   color: var(--muted-foreground);
   width: 14px;
   text-align: center;
+}
+
+.plan-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+  margin-left: -12px;
+  margin-right: -12px;
+  padding-left: 22px;
+}
+
+.plan-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.plan-usage {
+  font-size: 11px;
+  color: var(--muted-foreground);
 }
 
 .content {

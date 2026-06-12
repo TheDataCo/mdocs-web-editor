@@ -9,6 +9,7 @@ import { DOC_TEXT_FIELD } from '@mdocs/core'
 import { authenticate, issueApiToken, type Principal } from './auth.js'
 import { approveCliAuth, pollCliAuth, startCliAuth } from './cli-auth.js'
 import { addCommentToDoc, listComments, newComment, setCommentStatus } from './comments.js'
+import { getEntitlements, serializeEntitlements } from './entitlements.js'
 import { applyTextEdits, threeWayMerge } from './merge.js'
 import { loadDocState } from './persistence.js'
 import { checkpointHead, createVersion, getVersionContent, listVersions } from './versions.js'
@@ -105,6 +106,28 @@ export function createApi(hocuspocus: Hocuspocus) {
       select id, email, name from users where id = ${p.userId}
     `
     return c.json({ user })
+  })
+
+  // Current plan + entitlements + usage (so the UI can show "Free · 3/10 docs").
+  app.get('/api/me/plan', async (c) => {
+    const userId = requireUser(c)
+    if (!userId) return c.json({ plan: null })
+    const ent = await getEntitlements(userId)
+    const [docs] = await sql<{ n: number }[]>`
+      select count(*)::int as n from docs d
+      join workspace_members m on m.workspace_id = d.workspace_id and m.user_id = ${userId}
+      where d.deleted_at is null
+    `
+    const [collab] = await sql<{ n: number }[]>`
+      select count(distinct a.user_id)::int as n from doc_access a
+      join docs d on d.id = a.doc_id
+      where d.owner_id = ${userId} and a.user_id <> ${userId}
+    `
+    return c.json({
+      planName: ent.planName,
+      entitlements: serializeEntitlements(ent),
+      usage: { docs: docs?.n ?? 0, collaborators: collab?.n ?? 0 },
+    })
   })
 
   // Current markdown text of a doc (for CLI pull).

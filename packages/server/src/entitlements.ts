@@ -46,17 +46,19 @@ export function getEntitlements(principal: Principal): Promise<Entitlements> {
  * principal (from the session JWT). Wired in only when MDOCS_BILLING=clerk.
  * If features are unknown (non-browser principals like dd_ tokens), stays unlimited.
  */
+// Plans (by slug) drive entitlements: 'individual' unlocks everything; anything
+// else (incl. 'free_user') is the Free tier. planName undefined → non-browser
+// principal (dd_ token) → unlimited (not enforced on the CLI yet).
 export async function clerkEntitlements(p: Principal): Promise<Entitlements> {
-  if (p.kind !== 'user' || p.features === undefined) return UNLIMITED
-  const f = new Set(p.features)
-  const team = f.has('team_workspaces')
+  if (p.kind !== 'user' || p.planName === undefined) return UNLIMITED
+  const paid = p.planName === 'individual'
   return {
-    planName: p.planName || (team ? 'Individual' : 'Free'),
+    planName: paid ? 'Individual' : 'Free',
     maxDocs: Infinity, // unlimited personal docs on both plans
-    teamWorkspaces: team,
-    maxCollaborators: f.has('unlimited_collaborators') ? Infinity : 1,
-    versionHistory: f.has('version_history'),
-    apiCallsPerMonth: team ? 10000 : 500,
+    teamWorkspaces: paid,
+    maxCollaborators: paid ? Infinity : 1,
+    versionHistory: paid,
+    apiCallsPerMonth: paid ? 10000 : 500,
   }
 }
 

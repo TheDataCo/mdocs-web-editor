@@ -48,9 +48,9 @@ export function DocListPage() {
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
   const { has } = useAuth()
-  // Team workspaces require the feature on the hosted plan; self-host (billing off)
-  // allows everything.
-  const canTeam = !BILLING_ON || (has?.({ feature: 'team_workspaces' }) ?? false)
+  // Team workspaces require the Individual plan on the hosted instance; self-host
+  // (billing off) allows everything.
+  const canTeam = !BILLING_ON || (has?.({ plan: 'individual' }) ?? false)
 
   function onDropToWorkspace(workspaceId: string) {
     const id = dragId

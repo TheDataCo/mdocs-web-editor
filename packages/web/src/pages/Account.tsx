@@ -64,6 +64,12 @@ export function AccountPage() {
                   workspaces and invite collaborators.
                 </div>
               )}
+              {upgradeHint === 'trash' && plan.planName !== 'Individual' && (
+                <div className="upgrade-note">
+                  {plan.planName} keeps deleted docs and workspaces for 15 days. Upgrade to Individual to
+                  restore anything from the last 90 days.
+                </div>
+              )}
               <Meter label="Documents" used={plan.usage.docs} limit={plan.entitlements.maxDocs} />
               <Meter
                 label="Workspaces"

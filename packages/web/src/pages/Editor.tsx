@@ -10,10 +10,10 @@ import type { DocMeta } from '@mdocs/core'
 import { DOC_COMMENTS_FIELD, DOC_TEXT_FIELD } from '@mdocs/core'
 import { basicSetup, EditorView } from 'codemirror'
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next'
 import * as Y from 'yjs'
-import { createLink, getDoc, redeemLink, renameDoc, shareDoc } from '../api'
+import { createLink, deleteDoc, getDoc, redeemLink, renameDoc, shareDoc } from '../api'
 import { getToken } from '../auth'
 import { DocTree } from '../components/DocTree'
 import { WS_URL } from '../config'
@@ -51,6 +51,8 @@ export function EditorPage() {
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null)
   const [showResolved, setShowResolved] = useState(false)
   const [hasComments, setHasComments] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const navigate = useNavigate()
   const { user } = useUser()
   const displayName = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Someone'
 
@@ -227,10 +229,20 @@ export function EditorPage() {
 
   // Close the share menu on any outside click.
   useEffect(() => {
-    const close = () => setShareOpen(false)
+    const close = () => {
+      setShareOpen(false)
+      setConfirmDelete(false)
+    }
     window.addEventListener('click', close)
     return () => window.removeEventListener('click', close)
   }, [])
+
+  async function onDeleteDoc() {
+    setShareOpen(false)
+    setConfirmDelete(false)
+    await deleteDoc(id!).catch(() => {})
+    navigate('/')
+  }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -317,7 +329,15 @@ export function EditorPage() {
             {docCopied ? 'Copied ✓' : 'Copy'}
           </button>
           <div className="share-wrap" onClick={(e) => e.stopPropagation()}>
-            <button className="icon-btn" onClick={() => setShareOpen((o) => !o)} title="More" aria-label="More actions">
+            <button
+              className="icon-btn"
+              onClick={() => {
+                setShareOpen((o) => !o)
+                setConfirmDelete(false)
+              }}
+              title="More"
+              aria-label="More actions"
+            >
               ⋯
             </button>
             {shareOpen && (
@@ -345,6 +365,15 @@ export function EditorPage() {
                       <input name="email" type="email" placeholder="Invite by email…" />
                     </form>
                     {inviteMsg && <div className="share-msg">{inviteMsg}</div>}
+                    {confirmDelete ? (
+                      <button className="danger" onClick={onDeleteDoc}>
+                        Confirm delete
+                      </button>
+                    ) : (
+                      <button className="danger" onClick={() => setConfirmDelete(true)}>
+                        Delete
+                      </button>
+                    )}
                   </>
                 )}
               </div>

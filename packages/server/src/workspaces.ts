@@ -146,11 +146,13 @@ export async function listTrashedWorkspaces(userId: string, days: number): Promi
   `
 }
 
-/** Restore a workspace and the docs that were deleted with it. */
+/** Restore a workspace and the docs that were deleted with it. The doc match
+ * compares deleted_at entirely in SQL — pulling the timestamp into JS would
+ * truncate Postgres's microseconds to Date's milliseconds and match nothing. */
 export async function restoreWorkspace(workspaceId: string, days: number): Promise<boolean> {
   return sql.begin(async (tx) => {
-    const [ws] = await tx<{ deleted_at: string }[]>`
-      select deleted_at from workspaces
+    const [ws] = await tx<{ id: string }[]>`
+      select id from workspaces
       where id = ${workspaceId} and deleted_at is not null
         and deleted_at > now() - make_interval(days => ${days})
       for update
@@ -158,7 +160,8 @@ export async function restoreWorkspace(workspaceId: string, days: number): Promi
     if (!ws) return false
     await tx`
       update docs set deleted_at = null, updated_at = now()
-      where workspace_id = ${workspaceId} and deleted_at = ${ws.deleted_at}
+      where workspace_id = ${workspaceId}
+        and deleted_at = (select deleted_at from workspaces where id = ${workspaceId})
     `
     await tx`update workspaces set deleted_at = null, updated_at = now() where id = ${workspaceId}`
     return true

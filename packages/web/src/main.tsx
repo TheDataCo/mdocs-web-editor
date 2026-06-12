@@ -8,14 +8,31 @@ import { CliAuthPage } from './pages/CliAuth'
 import { DocListPage } from './pages/DocList'
 import { EditorPage } from './pages/Editor'
 import { PricingPage } from './pages/Pricing'
+import { SignInPage, SignUpPage } from './pages/SignIn'
 import './style.css'
 
+// Signed-out visitors land on the in-app /sign-in page (branded) instead of
+// the Clerk-hosted portal; RedirectToSignIn picks it up via ClerkProvider's
+// signInUrl.
+function Protected({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <SignedIn>{children}</SignedIn>
+      <SignedOut>
+        <RedirectToSignIn />
+      </SignedOut>
+    </>
+  )
+}
+
 const router = createBrowserRouter([
-  { path: '/', element: <DocListPage /> },
-  { path: '/d/:id', element: <EditorPage /> },
-  { path: '/cli-auth', element: <CliAuthPage /> },
-  { path: '/pricing', element: <PricingPage /> },
-  { path: '/account', element: <AccountPage /> },
+  { path: '/', element: <Protected><DocListPage /></Protected> },
+  { path: '/d/:id', element: <Protected><EditorPage /></Protected> },
+  { path: '/cli-auth', element: <Protected><CliAuthPage /></Protected> },
+  { path: '/pricing', element: <Protected><PricingPage /></Protected> },
+  { path: '/account', element: <Protected><AccountPage /></Protected> },
+  { path: '/sign-in/*', element: <SignInPage /> },
+  { path: '/sign-up/*', element: <SignUpPage /> },
 ])
 
 // Register Clerk's getToken so api.ts and the websocket can fetch session tokens.
@@ -30,12 +47,21 @@ function AuthBridge() {
 }
 
 createRoot(document.getElementById('root')!).render(
-  <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} afterSignOutUrl="/">
-    <SignedIn>
-      <AuthBridge />
-    </SignedIn>
-    <SignedOut>
-      <RedirectToSignIn />
-    </SignedOut>
+  <ClerkProvider
+    publishableKey={CLERK_PUBLISHABLE_KEY}
+    afterSignOutUrl="/"
+    signInUrl="/sign-in"
+    signUpUrl="/sign-up"
+    appearance={{
+      // Match the app: zero-chroma neutrals, Inter, 0.625rem radius.
+      variables: {
+        colorPrimary: '#1c1c1c',
+        colorText: '#252525',
+        fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        borderRadius: '0.625rem',
+      },
+    }}
+  >
+    <AuthBridge />
   </ClerkProvider>,
 )

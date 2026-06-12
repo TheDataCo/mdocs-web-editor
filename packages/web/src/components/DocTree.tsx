@@ -99,7 +99,7 @@ export function DocTree({ activeDocId, activeTitle }: { activeDocId?: string; ac
                   {isCollapsed ? '▸' : '▾'}
                 </button>
                 <span className="tree-ws-name" onClick={() => toggle(w.id)}>
-                  {w.type === 'personal' ? '•' : '⬡'} {w.name}
+                  • {w.name}
                 </span>
                 <button className="tree-add" title="New doc" onClick={() => onNewDoc(w.id)}>
                   +

@@ -79,6 +79,10 @@ export function EditorPage() {
   // + the caller's edit permission. Gate the editor build on this completing.
   useEffect(() => {
     let cancelled = false
+    // Reset on navigation so the previous doc doesn't flash while the new one loads.
+    setMeta(null)
+    setText('')
+    setCanEdit(null)
     ;(async () => {
       const share = new URLSearchParams(window.location.search).get('share')
       if (share) {
@@ -219,6 +223,9 @@ export function EditorPage() {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.defaultPrevented) return
+      // Don't hijack keystrokes while typing in an input/textarea (e.g. the title).
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return
       if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'e') {
         e.preventDefault()
         toggleRef.current()
@@ -270,6 +277,14 @@ export function EditorPage() {
             value={meta?.title ?? ''}
             placeholder="Untitled"
             onChange={(e) => onTitleChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                clearTimeout(titleSaveRef.current)
+                if (meta?.title.trim()) renameDoc(id!, meta.title.trim()).catch(() => {})
+                e.currentTarget.blur()
+              }
+            }}
             readOnly={!canEdit}
             aria-label="Document title"
           />
@@ -282,38 +297,6 @@ export function EditorPage() {
               </span>
             ))}
           </div>
-          {canEdit && (
-            <div className="share-wrap" onClick={(e) => e.stopPropagation()}>
-              <button className="btn" onClick={() => setShareOpen((o) => !o)}>
-                Share
-              </button>
-              {shareOpen && (
-                <div className="menu share-menu">
-                  <form
-                    className="share-invite"
-                    onSubmit={(e) => {
-                      e.preventDefault()
-                      const input = e.currentTarget.elements.namedItem('email') as HTMLInputElement
-                      onInviteEmail(input.value)
-                      input.value = ''
-                    }}
-                  >
-                    <input name="email" type="email" placeholder="Invite by email…" />
-                  </form>
-                  {inviteMsg && <div className="share-msg">{inviteMsg}</div>}
-                  <button onClick={() => onCopyLink('editor')}>
-                    {copied === 'editor' ? 'Copied ✓' : 'Copy edit link'}
-                  </button>
-                  <button onClick={() => onCopyLink('viewer')}>
-                    {copied === 'viewer' ? 'Copied ✓' : 'Copy read-only link'}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-          <button className="btn" onClick={onCopyDoc} title="Copy the full markdown (for pasting into an LLM)">
-            {docCopied ? 'Copied ✓' : 'Copy'}
-          </button>
           <button
             className={`btn ${commentsOpen ? 'primary' : ''}`}
             onClick={() => setCommentsOpen((o) => !o)}
@@ -321,9 +304,43 @@ export function EditorPage() {
           >
             Comments
           </button>
-          <button className="btn" onClick={() => toggleRef.current()} title="Toggle view (Cmd+E)">
-            {mode === 'preview' ? 'Edit' : 'Read'} <kbd>⌘E</kbd>
-          </button>
+          {!commentsOpen && (
+            <button className="btn" onClick={() => toggleRef.current()} title="Toggle view (Cmd+E)">
+              {mode === 'preview' ? 'Edit' : 'Read'} <kbd>⌘E</kbd>
+            </button>
+          )}
+          <div className="share-wrap" onClick={(e) => e.stopPropagation()}>
+            <button className="icon-btn" onClick={() => setShareOpen((o) => !o)} title="More" aria-label="More actions">
+              ⋯
+            </button>
+            {shareOpen && (
+              <div className="menu share-menu">
+                <button onClick={onCopyDoc}>{docCopied ? 'Copied ✓' : 'Copy markdown'}</button>
+                {canEdit && (
+                  <>
+                    <button onClick={() => onCopyLink('editor')}>
+                      {copied === 'editor' ? 'Copied ✓' : 'Copy edit link'}
+                    </button>
+                    <button onClick={() => onCopyLink('viewer')}>
+                      {copied === 'viewer' ? 'Copied ✓' : 'Copy read-only link'}
+                    </button>
+                    <form
+                      className="share-invite"
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        const input = e.currentTarget.elements.namedItem('email') as HTMLInputElement
+                        onInviteEmail(input.value)
+                        input.value = ''
+                      }}
+                    >
+                      <input name="email" type="email" placeholder="Invite by email…" />
+                    </form>
+                    {inviteMsg && <div className="share-msg">{inviteMsg}</div>}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
           {status !== 'connected' && <span className={`status ${status}`}>{status}…</span>}
           <UserButton />
         </div>

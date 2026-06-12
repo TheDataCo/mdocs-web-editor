@@ -532,6 +532,15 @@ body {
   font-weight: 500;
 }
 
+.ws-item.drop {
+  background: oklch(0.93 0.03 250);
+  outline: 1px dashed var(--ring);
+}
+
+.doclist.compact .row.dragging {
+  opacity: 0.4;
+}
+
 .ws-item.new {
   color: var(--muted-foreground);
   margin-top: 6px;

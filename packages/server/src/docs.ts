@@ -25,21 +25,23 @@ export async function listDocs(principal: Principal, workspaceId?: string): Prom
       where deleted_at is null order by updated_at desc
     `
   }
+  // A doc with any per-doc share lives in the Shared view only (single instance),
+  // so it's excluded from its home workspace listing.
   if (workspaceId) {
     return sql<DocRow[]>`
       select d.id, d.title, d.workspace_id, d.created_at, d.updated_at from docs d
       join workspace_members m on m.workspace_id = d.workspace_id and m.user_id = ${principal.userId}
       where d.workspace_id = ${workspaceId} and d.deleted_at is null
+        and not exists (select 1 from doc_access a where a.doc_id = d.id)
       order by d.updated_at desc
     `
   }
-  // All accessible docs (workspace membership ∪ direct shares).
+  // All docs in the user's workspaces (shared docs excluded — they're in Shared).
   return sql<DocRow[]>`
     select d.id, d.title, d.workspace_id, d.created_at, d.updated_at from docs d
-    where d.deleted_at is null and (
-      d.workspace_id in (select workspace_id from workspace_members where user_id = ${principal.userId})
-      or d.id in (select doc_id from doc_access where user_id = ${principal.userId})
-    )
+    where d.deleted_at is null
+      and d.workspace_id in (select workspace_id from workspace_members where user_id = ${principal.userId})
+      and not exists (select 1 from doc_access a where a.doc_id = d.id)
     order by d.updated_at desc
   `
 }

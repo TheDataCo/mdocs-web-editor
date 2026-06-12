@@ -10,6 +10,7 @@ import {
   listDocs,
   listShared,
   listWorkspaces,
+  moveDoc,
   renameDoc,
   renameWorkspace,
   type Workspace,
@@ -38,8 +39,21 @@ export function DocListPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteMsg, setInviteMsg] = useState<string | null>(null)
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [dropWs, setDropWs] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
+
+  function onDropToWorkspace(workspaceId: string) {
+    const id = dragId
+    setDragId(null)
+    setDropWs(null)
+    if (!id) return
+    setDocs((cur) => cur?.filter((d) => d.id !== id) ?? null) // leaves the current list
+    moveDoc(id, workspaceId).catch(() => {
+      if (activeId) listDocs(activeId).then(setDocs)
+    })
+  }
 
   const isShared = activeId === SHARED
   const active = workspaces.find((w) => w.id === activeId) ?? null
@@ -133,12 +147,20 @@ export function DocListPage() {
             ) : (
               <button
                 key={w.id}
-                className={`ws-item ${w.id === activeId ? 'active' : ''}`}
+                className={`ws-item ${w.id === activeId ? 'active' : ''} ${dropWs === w.id ? 'drop' : ''}`}
                 onClick={() => setActiveId(w.id)}
                 onDoubleClick={() => setRenamingWs(w.id)}
+                onDragOver={(e) => {
+                  if (dragId) {
+                    e.preventDefault()
+                    setDropWs(w.id)
+                  }
+                }}
+                onDragLeave={() => setDropWs((d) => (d === w.id ? null : d))}
+                onDrop={() => onDropToWorkspace(w.id)}
                 title="Double-click to rename"
               >
-                <span className="ws-glyph">{w.type === 'personal' ? '•' : '⬡'}</span>
+                <span className="ws-glyph">•</span>
                 {w.name}
               </button>
             ),
@@ -221,7 +243,14 @@ export function DocListPage() {
                   />
                 </div>
               ) : (
-                <div key={d.id} className="row" onClick={() => navigate(`/d/${d.id}`)}>
+                <div
+                  key={d.id}
+                  className={`row ${dragId === d.id ? 'dragging' : ''}`}
+                  draggable={!isShared}
+                  onDragStart={() => setDragId(d.id)}
+                  onDragEnd={() => setDragId(null)}
+                  onClick={() => navigate(`/d/${d.id}`)}
+                >
                   <span className="doclist-title">{d.title}</span>
                   {isShared && (
                     <span className="muted row-owner">{d.ownerName || d.ownerEmail || '—'}</span>

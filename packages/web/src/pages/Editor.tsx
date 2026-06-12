@@ -17,8 +17,8 @@ import { createLink, getDoc, redeemLink, renameDoc, shareDoc } from '../api'
 import { getToken } from '../auth'
 import { DocTree } from '../components/DocTree'
 import { WS_URL } from '../config'
+import { CommentMargin } from '../components/CommentMargin'
 import { commentHighlightField, computeCommentMarks, setCommentMarks } from '../lib/commentDecorations'
-import { CommentsPanel } from './Comments'
 import { Preview } from './Preview'
 
 // 'split' = source + live preview side by side (editing); 'preview' = single
@@ -49,7 +49,8 @@ export function EditorPage() {
   const [treeCollapsed, setTreeCollapsed] = useState(() => localStorage.getItem('mdocs:sidebar') === '1')
   const [previewCollapsed, setPreviewCollapsed] = useState(() => localStorage.getItem('mdocs:preview') === '1')
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null)
-  const [commentsOpen, setCommentsOpen] = useState(false)
+  const [showResolved, setShowResolved] = useState(false)
+  const [hasComments, setHasComments] = useState(false)
   const { user } = useUser()
   const displayName = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Someone'
 
@@ -68,6 +69,7 @@ export function EditorPage() {
 
   const editorRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
+  const previewInnerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const modeRef = useRef(mode)
   const titleSaveRef = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -185,6 +187,15 @@ export function EditorPage() {
     ytext.observe(syncPreviewText)
     provider.on('synced', syncPreviewText)
 
+    // A blank doc always opens ready to type, whatever the saved view mode.
+    let blankChecked = false
+    const openBlankInEdit = () => {
+      if (blankChecked) return
+      blankChecked = true
+      if (canEdit && ytext.toString().trim() === '') setMode('split')
+    }
+    provider.on('synced', openBlankInEdit)
+
     // Recompute comment highlights when comments change (and once after sync).
     const commentsMap = doc.getMap(DOC_COMMENTS_FIELD)
     const refreshMarks = () => view.dispatch({ effects: setCommentMarks.of(computeCommentMarks(doc)) })
@@ -256,6 +267,7 @@ export function EditorPage() {
   }
 
   function onPreviewDoubleClick(e: React.MouseEvent) {
+    if ((e.target as HTMLElement).closest('.comment-margin, .comment-fab')) return
     const view = viewRef.current
     const el = (e.target as HTMLElement).closest('[data-line]')
     if (view && el) {
@@ -298,18 +310,9 @@ export function EditorPage() {
               </span>
             ))}
           </div>
-          <button
-            className={`btn ${commentsOpen ? 'primary' : ''}`}
-            onClick={() => setCommentsOpen((o) => !o)}
-            title="Comments"
-          >
-            Comments
+          <button className="btn" onClick={() => toggleRef.current()} title="Toggle view (Cmd+E)">
+            {mode === 'preview' ? 'Edit' : 'Read'} <kbd>⌘E</kbd>
           </button>
-          {!commentsOpen && (
-            <button className="btn" onClick={() => toggleRef.current()} title="Toggle view (Cmd+E)">
-              {mode === 'preview' ? 'Edit' : 'Read'} <kbd>⌘E</kbd>
-            </button>
-          )}
           <div className="share-wrap" onClick={(e) => e.stopPropagation()}>
             <button className="icon-btn" onClick={() => setShareOpen((o) => !o)} title="More" aria-label="More actions">
               ⋯
@@ -317,6 +320,9 @@ export function EditorPage() {
             {shareOpen && (
               <div className="menu share-menu">
                 <button onClick={onCopyDoc}>{docCopied ? 'Copied ✓' : 'Copy markdown'}</button>
+                <button onClick={() => setShowResolved((v) => !v)}>
+                  {showResolved ? 'Hide resolved comments' : 'Show resolved comments'}
+                </button>
                 {canEdit && (
                   <>
                     <button onClick={() => onCopyLink('editor')}>
@@ -345,7 +351,7 @@ export function EditorPage() {
           {status !== 'connected' && <span className={`status ${status}`}>{status}…</span>}
           <UserMenu />
         </div>
-        <div className={`panes ${mode} ${previewCollapsed || commentsOpen ? 'preview-hidden' : ''}`}>
+        <div className={`panes ${mode} ${previewCollapsed ? 'preview-hidden' : ''}`}>
           <div className="pane pane-editor" ref={editorRef} />
           {mode === 'split' && (
             <div
@@ -356,21 +362,29 @@ export function EditorPage() {
               <span className="divider-btn">{previewCollapsed ? '‹' : '›'}</span>
             </div>
           )}
-          <div className="pane pane-preview" ref={previewRef} onDoubleClick={onPreviewDoubleClick}>
-            <div className="preview-inner">
+          <div
+            className={`pane pane-preview ${mode === 'preview' && hasComments ? 'with-comments' : ''}`}
+            ref={previewRef}
+            onDoubleClick={onPreviewDoubleClick}
+          >
+            <div className="preview-inner" ref={previewInnerRef}>
               <Preview text={text} />
             </div>
+            {mode === 'preview' && ydoc && (
+              <CommentMargin
+                doc={ydoc}
+                text={text}
+                paneRef={previewRef}
+                contentRef={previewInnerRef}
+                displayName={displayName}
+                avatarUrl={user?.imageUrl}
+                showResolved={showResolved}
+                onHasComments={setHasComments}
+              />
+            )}
           </div>
         </div>
       </div>
-      {commentsOpen && ydoc && (
-        <CommentsPanel
-          doc={ydoc}
-          view={viewRef.current}
-          displayName={displayName}
-          onClose={() => setCommentsOpen(false)}
-        />
-      )}
     </div>
   )
 }

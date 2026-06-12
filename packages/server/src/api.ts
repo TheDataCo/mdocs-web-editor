@@ -66,17 +66,20 @@ export function createApi(hocuspocus: Hocuspocus) {
     c.set('principal', principal)
 
     // CLI/agent (dd_ token) requests are the metered "API calls" — only on the
-    // hosted instance (BILLING=clerk); self-host neither meters nor logs.
+    // hosted instance (BILLING=clerk); self-host neither meters nor logs. Identity/
+    // account reads (/api/me*) are free — whoami, plan, and auth shouldn't cost.
     const isCli = principal.kind === 'user' && !!token && token.startsWith(API_TOKEN_PREFIX)
-    if (isCli && env.BILLING === 'clerk') {
-      const slug = await userPlanSlug((principal as { userId: string }).userId)
-      const limit = (await clerkEntitlements({ kind: 'user', userId: (principal as { userId: string }).userId, planName: slug })).apiCallsPerMonth
-      if (Number.isFinite(limit) && (await callsThisMonth((principal as { userId: string }).userId)) >= limit) {
+    const metered = isCli && env.BILLING === 'clerk' && !c.req.path.startsWith('/api/me')
+    if (metered) {
+      const userId = (principal as { userId: string }).userId
+      const slug = await userPlanSlug(userId)
+      const limit = (await clerkEntitlements({ kind: 'user', userId, planName: slug })).apiCallsPerMonth
+      if (Number.isFinite(limit) && (await callsThisMonth(userId)) >= limit) {
         return c.json({ error: { code: 'plan_limit', message: 'Monthly API call limit reached — upgrade for more.' } }, 429)
       }
     }
     await next()
-    if (isCli && env.BILLING === 'clerk') {
+    if (metered) {
       void logRequest((principal as { userId: string }).userId, c.req.method, c.req.path, c.res.status)
     }
   })

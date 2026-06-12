@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { createClerkClient, verifyToken } from '@clerk/backend'
 import { sql } from './db/index.js'
 import { env } from './env.js'
@@ -80,9 +80,14 @@ async function userFromApiToken(token: string): Promise<string | null> {
  * Resolve a bearer token (HTTP) or ws connection token to a principal.
  * Order: service token, then our CLI/API token, then a Clerk session JWT.
  */
+// Constant-time compare via digests so length differences don't short-circuit.
+function safeEqual(a: string, b: string): boolean {
+  return timingSafeEqual(createHash('sha256').update(a).digest(), createHash('sha256').update(b).digest())
+}
+
 export async function authenticate(token: string | undefined | null): Promise<Principal | null> {
   if (!token) return null
-  if (token === env.COLLAB_TOKEN) return { kind: 'service' }
+  if (env.COLLAB_TOKEN && safeEqual(token, env.COLLAB_TOKEN)) return { kind: 'service' }
 
   if (token.startsWith(API_TOKEN_PREFIX)) {
     const userId = await userFromApiToken(token)

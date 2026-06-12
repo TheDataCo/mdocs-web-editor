@@ -53,7 +53,7 @@ export function getEntitlements(principal: Principal): Promise<Entitlements> {
 
 /**
  * Hosted resolver: derive entitlements from Clerk Billing features carried on the
- * principal (from the session JWT). Wired in only when MDOCS_BILLING=clerk.
+ * principal (from the session JWT). Wired in only when BILLING=clerk.
  * If features are unknown (non-browser principals like dd_ tokens), stays unlimited.
  */
 // Plans (by slug) drive entitlements: 'individual' (displayed as "Pro" —

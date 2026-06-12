@@ -37,9 +37,6 @@ export function AccountPage() {
   return (
     <>
       <div className="topbar">
-        <Link to="/" className="back" aria-label="Back">
-          ←
-        </Link>
         <Wordmark />
         <span className="spacer" />
         <UserMenu />

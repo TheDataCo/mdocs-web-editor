@@ -98,7 +98,7 @@ export function DocListPage() {
   }
 
   async function onNewWorkspace() {
-    if (!canTeam) return void navigate('/account') // shows the workspace limit + Upgrade
+    if (!canTeam) return void navigate('/account?upgrade=workspaces') // shows the limit + Upgrade
     const ws = await createWorkspace('Untitled')
     setWorkspaces((cur) => [...cur, ws])
     setActiveId(ws.id)

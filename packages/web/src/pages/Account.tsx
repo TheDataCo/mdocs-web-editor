@@ -1,14 +1,24 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { type ActivityItem, getActivity, getPlan, type PlanInfo } from '../api'
 import { BILLING_ON } from '../config'
 import { Wordmark } from '../components/Wordmark'
 import { UserMenu } from '../components/UserMenu'
 
-function Meter({ label, used, limit }: { label: string; used: number; limit: number | null }) {
+function Meter({
+  label,
+  used,
+  limit,
+  highlight,
+}: {
+  label: string
+  used: number
+  limit: number | null
+  highlight?: boolean
+}) {
   const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0
   return (
-    <div className="meter">
+    <div className={`meter ${highlight ? 'highlight' : ''}`}>
       <div className="meter-head">
         <span>{label}</span>
         <span className="muted">
@@ -28,6 +38,8 @@ function Meter({ label, used, limit }: { label: string; used: number; limit: num
 export function AccountPage() {
   const [plan, setPlan] = useState<PlanInfo | null>(null)
   const [activity, setActivity] = useState<ActivityItem[] | null>(null)
+  const [params] = useSearchParams()
+  const upgradeHint = params.get('upgrade') // e.g. 'workspaces' (deep-link from a gated action)
 
   useEffect(() => {
     getPlan().then(setPlan, () => {})
@@ -56,11 +68,18 @@ export function AccountPage() {
               <p className="plan-line">
                 You're on <strong>{plan.planName}</strong>.
               </p>
+              {upgradeHint === 'workspaces' && !plan.entitlements.teamWorkspaces && (
+                <div className="upgrade-note">
+                  You've reached your workspace limit on {plan.planName}. Upgrade to create unlimited team
+                  workspaces and invite collaborators.
+                </div>
+              )}
               <Meter label="Documents" used={plan.usage.docs} limit={plan.entitlements.maxDocs} />
               <Meter
                 label="Workspaces"
                 used={plan.usage.workspaces}
                 limit={plan.entitlements.teamWorkspaces ? null : 1}
+                highlight={upgradeHint === 'workspaces'}
               />
               <Meter label="Shared collaborators" used={plan.usage.collaborators} limit={plan.entitlements.maxCollaborators} />
               <Meter label="API calls this month" used={plan.usage.apiCalls} limit={plan.entitlements.apiCallsPerMonth} />

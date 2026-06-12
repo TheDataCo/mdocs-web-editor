@@ -47,7 +47,7 @@ export function AccountPage() {
         <section className="account-section">
           <div className="account-head">
             <h2>Plan & usage</h2>
-            {BILLING_ON && plan?.planName !== 'Individual' && (
+            {BILLING_ON && plan?.planName !== 'Pro' && (
               <Link className="btn primary" to="/pricing">
                 Upgrade
               </Link>
@@ -64,10 +64,10 @@ export function AccountPage() {
                   workspaces and invite collaborators.
                 </div>
               )}
-              {upgradeHint === 'trash' && plan.planName !== 'Individual' && (
+              {upgradeHint === 'trash' && plan.planName !== 'Pro' && (
                 <div className="upgrade-note">
-                  {plan.planName} keeps deleted docs and workspaces for 15 days. Upgrade to Individual to
-                  restore anything from the last 90 days.
+                  {plan.planName} keeps deleted docs and workspaces for 15 days. Upgrade to Pro to restore
+                  anything from the last 90 days.
                 </div>
               )}
               <Meter label="Documents" used={plan.usage.docs} limit={plan.entitlements.maxDocs} />
@@ -83,6 +83,20 @@ export function AccountPage() {
                     ? 'unlimited'
                     : `up to ${plan.entitlements.maxCollaboratorsPerDoc}`}
                 </span>
+              </div>
+              {plan.entitlements.teamWorkspaces && (
+                <div className="plan-attr">
+                  <span>Members per workspace</span>
+                  <span className="muted">
+                    {plan.entitlements.maxMembersPerWorkspace == null
+                      ? 'unlimited'
+                      : `up to ${plan.entitlements.maxMembersPerWorkspace}`}
+                  </span>
+                </div>
+              )}
+              <div className="plan-attr">
+                <span>Deleted items recoverable for</span>
+                <span className="muted">{plan.entitlements.trashRetentionDays} days</span>
               </div>
               <Meter label="API calls this month" used={plan.usage.apiCalls} limit={plan.entitlements.apiCallsPerMonth} />
             </>

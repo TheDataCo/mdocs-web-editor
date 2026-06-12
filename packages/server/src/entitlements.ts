@@ -5,10 +5,11 @@
 // Stripe ids, or plan rows ever belong in this repo.
 
 export interface Entitlements {
-  planName: string // shown in the UI so users know their account ("Self-hosted", "Free", "Individual")
+  planName: string // shown in the UI so users know their account ("Self-hosted", "Free", "Pro")
   maxDocs: number // across the user's workspaces
   teamWorkspaces: boolean // may create/own team (collaborative) workspaces
   maxCollaboratorsPerDoc: number // people who can be granted access to a single doc (email + link)
+  maxMembersPerWorkspace: number // people in a team workspace (incl. the owner's seat-free invites)
   versionHistory: boolean // history + revert
   apiCallsPerMonth: number // metered by the cloud overlay; OSS does not meter
   trashRetentionDays: number // window for seeing/restoring deleted docs & workspaces
@@ -19,6 +20,7 @@ export const UNLIMITED: Entitlements = {
   maxDocs: Infinity,
   teamWorkspaces: true,
   maxCollaboratorsPerDoc: Infinity,
+  maxMembersPerWorkspace: Infinity,
   versionHistory: true,
   apiCallsPerMonth: Infinity,
   trashRetentionDays: 90,
@@ -31,6 +33,7 @@ export function serializeEntitlements(e: Entitlements) {
     ...e,
     maxDocs: n(e.maxDocs),
     maxCollaboratorsPerDoc: n(e.maxCollaboratorsPerDoc),
+    maxMembersPerWorkspace: n(e.maxMembersPerWorkspace),
     apiCallsPerMonth: n(e.apiCallsPerMonth),
   }
 }
@@ -53,17 +56,20 @@ export function getEntitlements(principal: Principal): Promise<Entitlements> {
  * principal (from the session JWT). Wired in only when MDOCS_BILLING=clerk.
  * If features are unknown (non-browser principals like dd_ tokens), stays unlimited.
  */
-// Plans (by slug) drive entitlements: 'individual' unlocks everything; anything
-// else (incl. 'free_user') is the Free tier. planName undefined → non-browser
-// principal (dd_ token) → unlimited (not enforced on the CLI yet).
+// Plans (by slug) drive entitlements: 'individual' (displayed as "Pro" —
+// the Clerk slug predates the rename and existing subscriptions keep it)
+// unlocks everything; anything else (incl. 'free_user') is the Free tier.
+// planName undefined → non-browser principal (dd_ token) → unlimited (not
+// enforced on the CLI yet).
 export async function clerkEntitlements(p: Principal): Promise<Entitlements> {
   if (p.kind !== 'user' || p.planName === undefined) return UNLIMITED
   const paid = p.planName === 'individual'
   return {
-    planName: paid ? 'Individual' : 'Free',
+    planName: paid ? 'Pro' : 'Free',
     maxDocs: Infinity, // unlimited personal docs on both plans
     teamWorkspaces: paid,
     maxCollaboratorsPerDoc: paid ? Infinity : 2,
+    maxMembersPerWorkspace: paid ? 5 : 0, // Free can't own team workspaces at all
     versionHistory: paid,
     apiCallsPerMonth: paid ? 10000 : 500,
     trashRetentionDays: paid ? 90 : 15,

@@ -37,8 +37,10 @@ import {
   softDeleteDoc,
 } from './docs.js'
 import {
+  countWorkspaceSeats,
   createTeamWorkspace,
   ensurePersonalWorkspace,
+  hasWorkspaceSeat,
   inviteToWorkspace,
   isMember,
   listMembers,
@@ -48,6 +50,7 @@ import {
   renameWorkspace,
   restoreWorkspace,
   softDeleteWorkspace,
+  workspaceOwnerId,
   workspaceType,
 } from './workspaces.js'
 
@@ -398,6 +401,20 @@ export function createApi(hocuspocus: Hocuspocus) {
     const body = await c.req.json().catch(() => ({}))
     const email = typeof body.email === 'string' ? body.email.trim() : ''
     if (!email) return c.json({ error: { code: 'invalid', message: 'email required' } }, 400)
+    // Per-workspace member cap, governed by the workspace OWNER's plan (hosted
+    // only). Re-inviting an existing member/invitee (role change) is exempt.
+    if (env.BILLING === 'clerk' && !(await hasWorkspaceSeat(wsId, email))) {
+      const owner = await workspaceOwnerId(wsId)
+      const slug = owner ? await userPlanSlug(owner) : undefined
+      const limit = (await clerkEntitlements({ kind: 'user', userId: owner ?? userId, planName: slug }))
+        .maxMembersPerWorkspace
+      if (Number.isFinite(limit) && (await countWorkspaceSeats(wsId)) >= limit) {
+        return c.json(
+          { error: { code: 'plan_limit', message: `This workspace is at its ${limit}-member limit.` } },
+          402,
+        )
+      }
+    }
     const inviteRole = body.role === 'admin' ? 'admin' : 'member'
     return c.json({ result: await inviteToWorkspace(wsId, email, inviteRole, userId) }, 201)
   })

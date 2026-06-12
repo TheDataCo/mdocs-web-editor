@@ -426,27 +426,6 @@ export function CommentMargin({
                     </span>
                   </div>
                   <div className="comment-tools" onClick={(e) => e.stopPropagation()}>
-                    {c.status === 'open' && (
-                      <button
-                        className="icon-btn"
-                        title="Mark as resolved and hide discussion"
-                        aria-label="Resolve"
-                        onClick={() => setStatus(c, 'resolved')}
-                      >
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M20 6 9 17l-5-5" />
-                        </svg>
-                      </button>
-                    )}
                     <div className="comment-menu-wrap">
                       <button
                         className="icon-btn"
@@ -511,6 +490,32 @@ export function CommentMargin({
                     }}
                     onClick={(e) => e.stopPropagation()}
                   />
+                )}
+                {c.status === 'open' && (
+                  <div className="comment-foot">
+                    <button
+                      className="comment-resolve"
+                      title="Mark as resolved and hide discussion"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setStatus(c, 'resolved')
+                      }}
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                      Resolve
+                    </button>
+                  </div>
                 )}
               </div>
             )

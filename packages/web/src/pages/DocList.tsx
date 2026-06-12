@@ -61,8 +61,8 @@ export function DocListPage() {
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
   const { has } = useAuth()
-  // Team workspaces require the Individual plan on the hosted instance; self-host
-  // (billing off) allows everything.
+  // Team workspaces require the Pro plan on the hosted instance (Clerk slug is
+  // still 'individual' from before the rename); self-host allows everything.
   const canTeam = !BILLING_ON || (has?.({ plan: 'individual' }) ?? false)
 
   function onDropToWorkspace(workspaceId: string) {
@@ -296,9 +296,13 @@ export function DocListPage() {
                 const input = e.currentTarget.elements.namedItem('email') as HTMLInputElement
                 const email = input.value.trim()
                 if (!email) return
-                const { status } = await inviteMember(active.id, email)
-                setInviteMsg(status === 'added' ? `Added ${email}` : `Invited ${email}`)
-                input.value = ''
+                try {
+                  const { status } = await inviteMember(active.id, email)
+                  setInviteMsg(status === 'added' ? `Added ${email}` : `Invited ${email}`)
+                  input.value = ''
+                } catch (err) {
+                  setInviteMsg((err as Error).message)
+                }
               }}
             >
               <input name="email" type="email" placeholder="Invite by email…" autoFocus />

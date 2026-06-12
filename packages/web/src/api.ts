@@ -29,7 +29,17 @@ async function request(path: string, init?: RequestInit) {
       ...init?.headers,
     },
   })
-  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`)
+  if (!res.ok) {
+    // Prefer the server's human-readable error message (e.g. plan limits).
+    const text = await res.text()
+    let msg = `API ${res.status}`
+    try {
+      msg = JSON.parse(text)?.error?.message ?? msg
+    } catch {
+      if (text) msg = `${msg}: ${text}`
+    }
+    throw new Error(msg)
+  }
   return res.json()
 }
 
@@ -162,8 +172,10 @@ export interface PlanInfo {
     maxDocs: number | null
     teamWorkspaces: boolean
     maxCollaboratorsPerDoc: number | null
+    maxMembersPerWorkspace: number | null
     versionHistory: boolean
     apiCallsPerMonth: number | null
+    trashRetentionDays: number
   }
   usage: { docs: number; workspaces: number; apiCalls: number }
 }

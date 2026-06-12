@@ -1061,9 +1061,35 @@ body {
 }
 
 /* Make room for the comment column: center the text in the space left of it. */
+.pane-preview {
+  container-type: inline-size;
+}
+
 .pane-preview.with-comments .preview-inner {
   margin-left: auto;
   margin-right: calc(312px + max(0px, (100% - 1132px) / 2));
+}
+
+/* Narrow pane: don't squeeze the text — pin the comment UI to the far right
+   edge as a light overlay instead. */
+@container (max-width: 1100px) {
+  .pane-preview.with-comments .preview-inner {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .comment-rail {
+    display: none;
+  }
+
+  .comment-margin {
+    right: 4px;
+    width: 264px;
+  }
+
+  .comment-fab {
+    right: 10px;
+  }
 }
 
 ::highlight(mdocs-comment) {
@@ -1092,22 +1118,23 @@ body {
   position: absolute;
   right: 286px;
   z-index: 10;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  border: 1px solid var(--border);
+  border: 1px solid #c4c4c4;
   background: var(--card);
-  color: var(--muted-foreground);
+  color: var(--foreground);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
 }
 
 .comment-fab:hover {
-  color: var(--foreground);
-  background: var(--muted);
+  background: var(--foreground);
+  color: var(--background);
+  border-color: var(--foreground);
 }
 
 .comment-margin {
@@ -1243,6 +1270,33 @@ body {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 10px;
+}
+
+/* Resolve sits at the card's bottom-right where it's easy to spot. */
+.comment-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.comment-resolve {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  background: none;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.comment-resolve:hover {
+  color: var(--foreground);
+  background: var(--muted);
 }
 
 /* Branded auth pages: dark panel with the token-stream animation + Clerk card. */

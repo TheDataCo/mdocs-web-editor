@@ -75,6 +75,36 @@ export async function renameWorkspace(workspaceId: string, name: string): Promis
   await sql`update workspaces set name = ${name}, updated_at = now() where id = ${workspaceId}`
 }
 
+export async function workspaceOwnerId(workspaceId: string): Promise<string | null> {
+  const [row] = await sql<{ owner_id: string }[]>`select owner_id from workspaces where id = ${workspaceId}`
+  return row?.owner_id ?? null
+}
+
+/** Seats taken in a workspace: current members + invitations not yet claimed. */
+export async function countWorkspaceSeats(workspaceId: string): Promise<number> {
+  const [row] = await sql<{ n: number }[]>`
+    select (select count(*)::int from workspace_members where workspace_id = ${workspaceId})
+         + (select count(*)::int from workspace_invitations
+            where workspace_id = ${workspaceId} and accepted_at is null) as n
+  `
+  return row?.n ?? 0
+}
+
+/** Is this email already a member of (or invited to) the workspace? Re-invites
+ * to change a role shouldn't count against the seat cap. */
+export async function hasWorkspaceSeat(workspaceId: string, email: string): Promise<boolean> {
+  const [row] = await sql<{ ok: boolean }[]>`
+    select exists(
+      select 1 from workspace_members m join users u on u.id = m.user_id
+      where m.workspace_id = ${workspaceId} and lower(u.email) = lower(${email})
+      union
+      select 1 from workspace_invitations
+      where workspace_id = ${workspaceId} and lower(email) = lower(${email}) and accepted_at is null
+    ) as ok
+  `
+  return row?.ok ?? false
+}
+
 export async function workspaceType(workspaceId: string): Promise<string | null> {
   const [row] = await sql<{ type: string }[]>`
     select type from workspaces where id = ${workspaceId} and deleted_at is null

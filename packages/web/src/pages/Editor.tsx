@@ -1,4 +1,5 @@
-import { UserButton, useUser } from '@clerk/clerk-react'
+import { useUser } from '@clerk/clerk-react'
+import { UserMenu } from '../components/UserMenu'
 import { indentWithTab } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { indentUnit } from '@codemirror/language'
@@ -342,7 +343,7 @@ export function EditorPage() {
             )}
           </div>
           {status !== 'connected' && <span className={`status ${status}`}>{status}…</span>}
-          <UserButton />
+          <UserMenu />
         </div>
         <div className={`panes ${mode} ${previewCollapsed || commentsOpen ? 'preview-hidden' : ''}`}>
           <div className="pane pane-editor" ref={editorRef} />

@@ -114,12 +114,24 @@ export interface PlanInfo {
     versionHistory: boolean
     apiCallsPerMonth: number | null
   }
-  usage: { docs: number; collaborators: number }
+  usage: { docs: number; collaborators: number; apiCalls: number }
 }
 
 export async function getPlan(): Promise<PlanInfo | null> {
   const res = await request('/api/me/plan')
   return res.planName ? res : null
+}
+
+export interface ActivityItem {
+  method: string
+  path: string
+  status: number
+  created_at: string
+}
+
+export async function getActivity(): Promise<ActivityItem[]> {
+  const { activity } = await request('/api/me/activity')
+  return activity
 }
 
 export async function getDoc(id: string): Promise<DocDetail> {

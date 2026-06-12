@@ -1,4 +1,5 @@
-import { UserButton, useAuth } from '@clerk/clerk-react'
+import { useAuth } from '@clerk/clerk-react'
+import { UserMenu } from '../components/UserMenu'
 import type { DocMeta } from '@mdocs/core'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
@@ -136,7 +137,7 @@ export function DocListPage() {
       <div className="topbar">
         <Wordmark />
         <span className="spacer" />
-        <UserButton />
+        <UserMenu />
       </div>
       <div className="layout">
         <aside className="sidebar">

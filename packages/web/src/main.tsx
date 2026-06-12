@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import { setTokenGetter } from './auth'
 import { CLERK_PUBLISHABLE_KEY } from './config'
+import { AccountPage } from './pages/Account'
 import { CliAuthPage } from './pages/CliAuth'
 import { DocListPage } from './pages/DocList'
 import { EditorPage } from './pages/Editor'
@@ -14,6 +15,7 @@ const router = createBrowserRouter([
   { path: '/d/:id', element: <EditorPage /> },
   { path: '/cli-auth', element: <CliAuthPage /> },
   { path: '/pricing', element: <PricingPage /> },
+  { path: '/account', element: <AccountPage /> },
 ])
 
 // Register Clerk's getToken so api.ts and the websocket can fetch session tokens.

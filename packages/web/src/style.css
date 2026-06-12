@@ -588,6 +588,88 @@ body {
   text-decoration: underline;
 }
 
+.account-wrap {
+  max-width: 720px;
+  margin: 32px auto;
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.account-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.account-section h2 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 8px;
+}
+
+.plan-line {
+  font-size: 14px;
+  margin: 4px 0 16px;
+}
+
+.meter {
+  margin-bottom: 14px;
+}
+
+.meter-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.meter-bar {
+  height: 6px;
+  background: var(--muted);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 999px;
+}
+
+.activity {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.activity td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.act-method {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted-foreground);
+  width: 56px;
+}
+
+.act-path {
+  font-family: var(--font-mono);
+}
+
+.act-status.err {
+  color: var(--destructive);
+}
+
+.act-time {
+  text-align: right;
+  white-space: nowrap;
+}
+
 .pricing-wrap {
   max-width: 920px;
   margin: 32px auto;

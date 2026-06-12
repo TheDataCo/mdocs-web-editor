@@ -211,6 +211,23 @@ export const comments = pgTable(
   (t) => [index('comments_doc_status_idx').on(t.docId, t.status)],
 )
 
+// One row per CLI/agent (dd_ token) API request — powers the usage meter
+// ("API calls / month") and the activity log. Web/session traffic is NOT logged.
+export const apiRequests = pgTable(
+  'api_requests',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    method: text('method').notNull(),
+    path: text('path').notNull(),
+    status: bigint('status', { mode: 'number' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('api_requests_user_time_idx').on(t.userId, t.createdAt)],
+)
+
 export const linkShares = pgTable('link_shares', {
   id: uuid('id').primaryKey().defaultRandom(),
   docId: uuid('doc_id')

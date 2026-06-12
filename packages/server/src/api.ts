@@ -6,10 +6,13 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { DOC_TEXT_FIELD } from '@mdocs/core'
-import { authenticate, issueApiToken, type Principal } from './auth.js'
+import { API_TOKEN_PREFIX, authenticate, issueApiToken, type Principal } from './auth.js'
+import { userPlanSlug } from './billing.js'
 import { approveCliAuth, pollCliAuth, startCliAuth } from './cli-auth.js'
 import { addCommentToDoc, listComments, newComment, setCommentStatus } from './comments.js'
-import { getEntitlements, serializeEntitlements } from './entitlements.js'
+import { clerkEntitlements, getEntitlements, serializeEntitlements } from './entitlements.js'
+import { env } from './env.js'
+import { callsThisMonth, logRequest, recentActivity } from './usage.js'
 import { applyTextEdits, threeWayMerge } from './merge.js'
 import { loadDocState } from './persistence.js'
 import { checkpointHead, createVersion, getVersionContent, listVersions } from './versions.js'
@@ -61,7 +64,21 @@ export function createApi(hocuspocus: Hocuspocus) {
       return c.json({ error: { code: 'auth_failed', message: 'invalid or missing token' } }, 401)
     }
     c.set('principal', principal)
+
+    // CLI/agent (dd_ token) requests are the metered "API calls" — only on the
+    // hosted instance (BILLING=clerk); self-host neither meters nor logs.
+    const isCli = principal.kind === 'user' && !!token && token.startsWith(API_TOKEN_PREFIX)
+    if (isCli && env.BILLING === 'clerk') {
+      const slug = await userPlanSlug((principal as { userId: string }).userId)
+      const limit = (await clerkEntitlements({ kind: 'user', userId: (principal as { userId: string }).userId, planName: slug })).apiCallsPerMonth
+      if (Number.isFinite(limit) && (await callsThisMonth((principal as { userId: string }).userId)) >= limit) {
+        return c.json({ error: { code: 'plan_limit', message: 'Monthly API call limit reached — upgrade for more.' } }, 429)
+      }
+    }
     await next()
+    if (isCli && env.BILLING === 'clerk') {
+      void logRequest((principal as { userId: string }).userId, c.req.method, c.req.path, c.res.status)
+    }
   })
 
   function requireUser(c: { get: (k: 'principal') => Principal }): string | null {
@@ -126,8 +143,15 @@ export function createApi(hocuspocus: Hocuspocus) {
     return c.json({
       planName: ent.planName,
       entitlements: serializeEntitlements(ent),
-      usage: { docs: docs?.n ?? 0, collaborators: collab?.n ?? 0 },
+      usage: { docs: docs?.n ?? 0, collaborators: collab?.n ?? 0, apiCalls: await callsThisMonth(userId) },
     })
+  })
+
+  // Recent CLI/agent API requests for this user (the activity log).
+  app.get('/api/me/activity', async (c) => {
+    const userId = requireUser(c)
+    if (!userId) return c.json({ activity: [] })
+    return c.json({ activity: await recentActivity(userId, 100) })
   })
 
   // Current markdown text of a doc (for CLI pull).

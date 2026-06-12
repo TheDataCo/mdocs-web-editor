@@ -57,6 +57,11 @@ export function AccountPage() {
                 You're on <strong>{plan.planName}</strong>.
               </p>
               <Meter label="Documents" used={plan.usage.docs} limit={plan.entitlements.maxDocs} />
+              <Meter
+                label="Workspaces"
+                used={plan.usage.workspaces}
+                limit={plan.entitlements.teamWorkspaces ? null : 1}
+              />
               <Meter label="Shared collaborators" used={plan.usage.collaborators} limit={plan.entitlements.maxCollaborators} />
               <Meter label="API calls this month" used={plan.usage.apiCalls} limit={plan.entitlements.apiCallsPerMonth} />
             </>

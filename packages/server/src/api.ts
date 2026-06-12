@@ -143,10 +143,18 @@ export function createApi(hocuspocus: Hocuspocus) {
       join docs d on d.id = a.doc_id
       where d.owner_id = ${userId} and a.user_id <> ${userId}
     `
+    const [ws] = await sql<{ n: number }[]>`
+      select count(*)::int as n from workspace_members where user_id = ${userId}
+    `
     return c.json({
       planName: ent.planName,
       entitlements: serializeEntitlements(ent),
-      usage: { docs: docs?.n ?? 0, collaborators: collab?.n ?? 0, apiCalls: await callsThisMonth(userId) },
+      usage: {
+        docs: docs?.n ?? 0,
+        collaborators: collab?.n ?? 0,
+        workspaces: ws?.n ?? 0,
+        apiCalls: await callsThisMonth(userId),
+      },
     })
   })
 

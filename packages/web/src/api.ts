@@ -114,7 +114,7 @@ export interface PlanInfo {
     versionHistory: boolean
     apiCallsPerMonth: number | null
   }
-  usage: { docs: number; collaborators: number; apiCalls: number }
+  usage: { docs: number; collaborators: number; workspaces: number; apiCalls: number }
 }
 
 export async function getPlan(): Promise<PlanInfo | null> {

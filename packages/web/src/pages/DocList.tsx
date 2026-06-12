@@ -1,7 +1,8 @@
-import { UserButton } from '@clerk/clerk-react'
+import { UserButton, useAuth } from '@clerk/clerk-react'
 import type { DocMeta } from '@mdocs/core'
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { BILLING_ON } from '../config'
 import {
   createDoc,
   createWorkspace,
@@ -46,6 +47,10 @@ export function DocListPage() {
   const [plan, setPlan] = useState<PlanInfo | null>(null)
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
+  const { has } = useAuth()
+  // Team workspaces require the feature on the hosted plan; self-host (billing off)
+  // allows everything.
+  const canTeam = !BILLING_ON || (has?.({ feature: 'team_workspaces' }) ?? false)
 
   function onDropToWorkspace(workspaceId: string) {
     const id = dragId
@@ -96,6 +101,7 @@ export function DocListPage() {
   }
 
   async function onNewWorkspace() {
+    if (!canTeam) return void navigate('/pricing') // upgrade to create team workspaces
     const ws = await createWorkspace('Untitled')
     setWorkspaces((cur) => [...cur, ws])
     setActiveId(ws.id)
@@ -178,7 +184,7 @@ export function DocListPage() {
             Shared
           </button>
           <button className="ws-item new" onClick={onNewWorkspace}>
-            + New workspace
+            {canTeam ? '+ New workspace' : '⭡ Upgrade for workspaces'}
           </button>
           {plan && (
             <div className="plan-footer" title="Your plan and usage">
@@ -189,6 +195,11 @@ export function DocListPage() {
                 {plan.entitlements.maxCollaborators != null &&
                   ` · ${plan.usage.collaborators}/${plan.entitlements.maxCollaborators} shared`}
               </span>
+              {BILLING_ON && !canTeam && (
+                <Link className="plan-upgrade" to="/pricing">
+                  Upgrade →
+                </Link>
+              )}
             </div>
           )}
         </aside>

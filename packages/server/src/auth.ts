@@ -8,7 +8,10 @@ import { claimInvitations, ensurePersonalWorkspace } from './workspaces.js'
 // - 'user'    → a real person (Clerk browser session) or CLI token, with our users.id
 // - 'service' → the shared COLLAB_TOKEN (sync-check/admin); no user row, full access
 export type Principal =
-  | { kind: 'user'; userId: string }
+  // features/planName come from the Clerk session JWT (Billing); undefined for
+  // non-browser principals (dd_ tokens), which the entitlements layer treats as
+  // "plan unknown" → unlimited.
+  | { kind: 'user'; userId: string; features?: string[]; planName?: string }
   | { kind: 'service' }
 
 const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY })
@@ -89,7 +92,18 @@ export async function authenticate(token: string | undefined | null): Promise<Pr
   try {
     const claims = await verifyToken(token, { secretKey: env.CLERK_SECRET_KEY })
     if (!claims.sub) return null
-    return { kind: 'user', userId: await userFromClerk(claims.sub) }
+    // Clerk Billing puts the active plan ('pla') + granted features ('fea') in the
+    // session token; strip any scope prefix (e.g. "u:team_workspaces").
+    const c = claims as Record<string, unknown>
+    const features =
+      typeof c.fea === 'string'
+        ? c.fea
+            .split(',')
+            .map((s) => s.trim().split(':').pop() ?? '')
+            .filter(Boolean)
+        : []
+    const planName = typeof c.pla === 'string' ? (c.pla.split(':').pop() ?? undefined) : undefined
+    return { kind: 'user', userId: await userFromClerk(claims.sub), features, planName }
   } catch {
     return null
   }

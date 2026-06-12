@@ -26,5 +26,7 @@ export const env = {
   CLERK_SECRET_KEY: required('CLERK_SECRET_KEY'),
   // Server-only service credential (sync-check / admin). NEVER shipped to browsers.
   COLLAB_TOKEN: process.env.COLLAB_TOKEN ?? 'dev-token',
+  // 'clerk' enables Clerk Billing plan enforcement; unset (self-host) = unlimited.
+  BILLING: process.env.BILLING,
   PORT: Number(process.env.PORT ?? 3001),
 }

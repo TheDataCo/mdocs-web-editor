@@ -112,7 +112,7 @@ export function createApi(hocuspocus: Hocuspocus) {
   app.get('/api/me/plan', async (c) => {
     const userId = requireUser(c)
     if (!userId) return c.json({ plan: null })
-    const ent = await getEntitlements(userId)
+    const ent = await getEntitlements(c.get('principal'))
     const [docs] = await sql<{ n: number }[]>`
       select count(*)::int as n from docs d
       join workspace_members m on m.workspace_id = d.workspace_id and m.user_id = ${userId}
@@ -290,6 +290,10 @@ export function createApi(hocuspocus: Hocuspocus) {
   app.post('/api/workspaces', async (c) => {
     const userId = requireUser(c)
     if (!userId) return c.json({ error: { code: 'permission_denied', message: 'sign in' } }, 403)
+    // Team workspaces are a paid feature on the hosted plan (no-op on self-host).
+    if (!(await getEntitlements(c.get('principal'))).teamWorkspaces) {
+      return c.json({ error: { code: 'plan_limit', message: 'Upgrade to create team workspaces' } }, 402)
+    }
     const body = await c.req.json().catch(() => ({}))
     const name = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : 'Team'
     return c.json({ workspace: await createTeamWorkspace(userId, name) }, 201)

@@ -28,15 +28,36 @@ export function serializeEntitlements(e: Entitlements) {
   return { ...e, maxDocs: n(e.maxDocs), maxCollaborators: n(e.maxCollaborators), apiCallsPerMonth: n(e.apiCallsPerMonth) }
 }
 
-let resolver: (userId: string) => Promise<Entitlements> = async () => UNLIMITED
+import type { Principal } from './auth.js'
+
+let resolver: (p: Principal) => Promise<Entitlements> = async () => UNLIMITED
 
 /** Hosted overlay calls this at startup to enforce paid plans. OSS leaves it default. */
-export function setEntitlementsResolver(fn: (userId: string) => Promise<Entitlements>): void {
+export function setEntitlementsResolver(fn: (p: Principal) => Promise<Entitlements>): void {
   resolver = fn
 }
 
-export function getEntitlements(userId: string): Promise<Entitlements> {
-  return resolver(userId)
+export function getEntitlements(principal: Principal): Promise<Entitlements> {
+  return resolver(principal)
+}
+
+/**
+ * Hosted resolver: derive entitlements from Clerk Billing features carried on the
+ * principal (from the session JWT). Wired in only when MDOCS_BILLING=clerk.
+ * If features are unknown (non-browser principals like dd_ tokens), stays unlimited.
+ */
+export async function clerkEntitlements(p: Principal): Promise<Entitlements> {
+  if (p.kind !== 'user' || p.features === undefined) return UNLIMITED
+  const f = new Set(p.features)
+  const team = f.has('team_workspaces')
+  return {
+    planName: p.planName || (team ? 'Individual' : 'Free'),
+    maxDocs: Infinity, // unlimited personal docs on both plans
+    teamWorkspaces: team,
+    maxCollaborators: f.has('unlimited_collaborators') ? Infinity : 1,
+    versionHistory: f.has('version_history'),
+    apiCallsPerMonth: team ? 10000 : 500,
+  }
 }
 
 /** Thrown by gates when an action exceeds the user's plan. */

@@ -6,6 +6,7 @@ import * as Y from 'yjs'
 import { createApi } from './api.js'
 import { authenticate, type Principal } from './auth.js'
 import { attachCommentMirror } from './comments.js'
+import { clerkEntitlements, setEntitlementsResolver } from './entitlements.js'
 import { canAccess, canEdit, docExists } from './docs.js'
 import { env } from './env.js'
 import { appendUpdate, ensureDoc, loadDocState, saveSnapshot } from './persistence.js'
@@ -60,6 +61,9 @@ const hocuspocus = new Hocuspocus({
     await saveSnapshot(documentName, document)
   },
 })
+
+// Hosted deployment enforces Clerk Billing plans; self-host stays unlimited.
+if (env.BILLING === 'clerk') setEntitlementsResolver(clerkEntitlements)
 
 // One port: Hono answers HTTP, websocket upgrades go to Hocuspocus.
 const app = createApi(hocuspocus)

@@ -576,6 +576,31 @@ body {
   color: var(--muted-foreground);
 }
 
+.plan-upgrade {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--foreground);
+  text-decoration: none;
+  margin-top: 2px;
+}
+
+.plan-upgrade:hover {
+  text-decoration: underline;
+}
+
+.pricing-wrap {
+  max-width: 920px;
+  margin: 32px auto;
+  padding: 0 20px;
+}
+
+.pricing-wrap h2 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: 20px;
+}
+
 .content {
   flex: 1;
   min-width: 0;

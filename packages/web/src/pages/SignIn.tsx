@@ -1,13 +1,12 @@
 import { SignIn, SignUp } from '@clerk/clerk-react'
-import { DataFlow } from '../components/DataFlow'
+import { AgentDemo } from '../components/AgentDemo'
 
 // Branded auth pages (replacing the Clerk-hosted redirect): dark brand panel
-// with the datacoweb token-stream animation + the Clerk card on the right.
+// with a looping agent-workflow demo + the Clerk card on the right.
 function AuthShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="auth-page">
       <aside className="auth-brand">
-        <DataFlow className="auth-anim" />
         <div className="auth-brand-inner">
           <div className="wordmark auth-wordmark">
             <span className="keycap">m</span>
@@ -16,11 +15,12 @@ function AuthShell({ children }: { children: React.ReactNode }) {
               <span className="tagline">Docs for Markdown</span>
             </div>
           </div>
-          <h1>Markdown docs for humans and agents.</h1>
+          <h1>Work with your agent.</h1>
           <p>
-            The same document, live in your browser and your terminal. Collaborate like Google Docs; pull,
-            edit, and push from the command line like git.
+            The same document, live in your browser and your terminal. You write like Google Docs; your
+            agent pulls, edits, and pushes from the command line like git.
           </p>
+          <AgentDemo />
         </div>
       </aside>
       <main className="auth-card">{children}</main>

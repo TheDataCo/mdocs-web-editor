@@ -272,7 +272,23 @@ export function createApi(hocuspocus: Hocuspocus) {
     const body = await c.req.json().catch(() => ({}))
     const text = typeof body.body === 'string' ? body.body.trim() : ''
     if (!text) return c.json({ error: { code: 'invalid', message: 'body required' } }, 400)
-    const comment = newComment(principal, text, typeof body.excerpt === 'string' ? body.excerpt : '', body.parentId ?? null)
+    // Comments posted with a dd_ token are signed as the owner's agent —
+    // "<name> (email's agent)" when the CLI passes --as, else "email's agent".
+    // The suffix is applied server-side so an agent can't impersonate a person.
+    let authorName: string | null = null
+    if (principal.kind === 'user' && c.req.header('Authorization')?.startsWith(`Bearer ${API_TOKEN_PREFIX}`)) {
+      const [u] = await sql<{ email: string }[]>`select email from users where id = ${principal.userId}`
+      const who = u?.email ?? 'unknown'
+      const signed = typeof body.author === 'string' && body.author.trim() ? body.author.trim().slice(0, 60) : null
+      authorName = signed ? `${signed} (${who}'s agent)` : `${who}'s agent`
+    }
+    const comment = newComment(
+      principal,
+      text,
+      typeof body.excerpt === 'string' ? body.excerpt : '',
+      body.parentId ?? null,
+      authorName,
+    )
     await addCommentToDoc(hocuspocus, id, comment)
     return c.json({ comment }, 201)
   })

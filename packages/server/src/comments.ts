@@ -59,11 +59,17 @@ export async function listComments(docId: string, status?: string) {
 }
 
 /** Build a new comment value (document-level unless an anchor is supplied). */
-export function newComment(principal: Principal, body: string, excerpt = '', parentId: string | null = null): CommentValue {
+export function newComment(
+  principal: Principal,
+  body: string,
+  excerpt = '',
+  parentId: string | null = null,
+  authorName: string | null = null,
+): CommentValue {
   return {
     id: randomUUID(),
     authorId: principal.kind === 'user' ? principal.userId : null,
-    authorName: null,
+    authorName,
     body,
     anchorStart: null,
     anchorEnd: null,

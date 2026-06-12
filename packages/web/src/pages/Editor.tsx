@@ -313,13 +313,15 @@ export function EditorPage() {
           <button className="btn" onClick={() => toggleRef.current()} title="Toggle view (Cmd+E)">
             {mode === 'preview' ? 'Edit' : 'Read'} <kbd>⌘E</kbd>
           </button>
+          <button className="btn" onClick={onCopyDoc} title="Copy markdown">
+            {docCopied ? 'Copied ✓' : 'Copy'}
+          </button>
           <div className="share-wrap" onClick={(e) => e.stopPropagation()}>
             <button className="icon-btn" onClick={() => setShareOpen((o) => !o)} title="More" aria-label="More actions">
               ⋯
             </button>
             {shareOpen && (
               <div className="menu share-menu">
-                <button onClick={onCopyDoc}>{docCopied ? 'Copied ✓' : 'Copy markdown'}</button>
                 <button onClick={() => setShowResolved((v) => !v)}>
                   {showResolved ? 'Hide resolved comments' : 'Show resolved comments'}
                 </button>

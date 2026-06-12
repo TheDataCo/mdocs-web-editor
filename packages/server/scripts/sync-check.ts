@@ -8,7 +8,11 @@ import * as Y from 'yjs'
 import { DOC_TEXT_FIELD } from '@mdocs/core'
 
 const URL = process.env.SYNC_URL ?? 'ws://localhost:3001'
-const TOKEN = process.env.COLLAB_TOKEN ?? 'dev-token'
+const TOKEN = process.env.COLLAB_TOKEN
+if (!TOKEN) {
+  console.error('Set COLLAB_TOKEN (the server no longer has a default service token).')
+  process.exit(1)
+}
 const DOC = process.env.SYNC_DOC ?? '00000000-0000-0000-0000-00000000c0de'
 
 function connect(token = TOKEN) {

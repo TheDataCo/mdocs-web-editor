@@ -561,7 +561,8 @@ export function createApi(hocuspocus: Hocuspocus) {
   app.patch('/api/docs/:id', async (c) => {
     const id = c.req.param('id')
     const principal = c.get('principal')
-    if (!(await canAccess(principal, id))) {
+    // Rename/move are writes — viewer shares grant read access only.
+    if (!(await canEdit(principal, id))) {
       return c.json({ error: { code: 'permission_denied', message: 'no access' } }, 403)
     }
     const body = await c.req.json().catch(() => ({}))
@@ -583,7 +584,7 @@ export function createApi(hocuspocus: Hocuspocus) {
 
   app.delete('/api/docs/:id', async (c) => {
     const id = c.req.param('id')
-    if (!(await canAccess(c.get('principal'), id))) {
+    if (!(await canEdit(c.get('principal'), id))) {
       return c.json({ error: { code: 'permission_denied', message: 'no access' } }, 403)
     }
     await softDeleteDoc(id)
@@ -593,7 +594,9 @@ export function createApi(hocuspocus: Hocuspocus) {
   // Share a single doc with a specific person (grants access outside its workspace).
   app.post('/api/docs/:id/share', async (c) => {
     const id = c.req.param('id')
-    if (!(await canAccess(c.get('principal'), id))) {
+    // Sharing grants access, so it needs edit rights — otherwise a viewer
+    // could re-share, or upsert their own row from viewer to editor.
+    if (!(await canEdit(c.get('principal'), id))) {
       return c.json({ error: { code: 'permission_denied', message: 'no access' } }, 403)
     }
     const body = await c.req.json().catch(() => ({}))

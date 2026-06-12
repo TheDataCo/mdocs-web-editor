@@ -5,20 +5,10 @@ import { BILLING_ON } from '../config'
 import { Wordmark } from '../components/Wordmark'
 import { UserMenu } from '../components/UserMenu'
 
-function Meter({
-  label,
-  used,
-  limit,
-  highlight,
-}: {
-  label: string
-  used: number
-  limit: number | null
-  highlight?: boolean
-}) {
+function Meter({ label, used, limit }: { label: string; used: number; limit: number | null }) {
   const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0
   return (
-    <div className={`meter ${highlight ? 'highlight' : ''}`}>
+    <div className="meter">
       <div className="meter-head">
         <span>{label}</span>
         <span className="muted">
@@ -79,9 +69,15 @@ export function AccountPage() {
                 label="Workspaces"
                 used={plan.usage.workspaces}
                 limit={plan.entitlements.teamWorkspaces ? null : 1}
-                highlight={upgradeHint === 'workspaces'}
               />
-              <Meter label="Shared collaborators" used={plan.usage.collaborators} limit={plan.entitlements.maxCollaborators} />
+              <div className="plan-attr">
+                <span>Collaborators per document</span>
+                <span className="muted">
+                  {plan.entitlements.maxCollaboratorsPerDoc == null
+                    ? 'unlimited'
+                    : `up to ${plan.entitlements.maxCollaboratorsPerDoc}`}
+                </span>
+              </div>
               <Meter label="API calls this month" used={plan.usage.apiCalls} limit={plan.entitlements.apiCallsPerMonth} />
             </>
           ) : (

@@ -618,12 +618,15 @@ body {
 
 .meter {
   margin-bottom: 14px;
-  border-radius: 8px;
 }
 
-.meter.highlight {
-  outline: 2px solid var(--ring);
-  outline-offset: 6px;
+.plan-attr {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 6px;
 }
 
 .upgrade-note {

@@ -110,11 +110,11 @@ export interface PlanInfo {
   entitlements: {
     maxDocs: number | null
     teamWorkspaces: boolean
-    maxCollaborators: number | null
+    maxCollaboratorsPerDoc: number | null
     versionHistory: boolean
     apiCallsPerMonth: number | null
   }
-  usage: { docs: number; collaborators: number; workspaces: number; apiCalls: number }
+  usage: { docs: number; workspaces: number; apiCalls: number }
 }
 
 export async function getPlan(): Promise<PlanInfo | null> {

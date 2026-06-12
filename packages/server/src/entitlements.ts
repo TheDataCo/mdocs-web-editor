@@ -8,7 +8,7 @@ export interface Entitlements {
   planName: string // shown in the UI so users know their account ("Self-hosted", "Free", "Individual")
   maxDocs: number // across the user's workspaces
   teamWorkspaces: boolean // may create/own team (collaborative) workspaces
-  maxCollaborators: number // distinct people a user may share their docs with
+  maxCollaboratorsPerDoc: number // people who can be granted access to a single doc (email + link)
   versionHistory: boolean // history + revert
   apiCallsPerMonth: number // metered by the cloud overlay; OSS does not meter
 }
@@ -17,7 +17,7 @@ export const UNLIMITED: Entitlements = {
   planName: 'Self-hosted',
   maxDocs: Infinity,
   teamWorkspaces: true,
-  maxCollaborators: Infinity,
+  maxCollaboratorsPerDoc: Infinity,
   versionHistory: true,
   apiCallsPerMonth: Infinity,
 }
@@ -25,7 +25,12 @@ export const UNLIMITED: Entitlements = {
 /** JSON can't carry Infinity; send unlimited as null so the client renders "∞". */
 export function serializeEntitlements(e: Entitlements) {
   const n = (v: number) => (v === Infinity ? null : v)
-  return { ...e, maxDocs: n(e.maxDocs), maxCollaborators: n(e.maxCollaborators), apiCallsPerMonth: n(e.apiCallsPerMonth) }
+  return {
+    ...e,
+    maxDocs: n(e.maxDocs),
+    maxCollaboratorsPerDoc: n(e.maxCollaboratorsPerDoc),
+    apiCallsPerMonth: n(e.apiCallsPerMonth),
+  }
 }
 
 import type { Principal } from './auth.js'
@@ -56,7 +61,7 @@ export async function clerkEntitlements(p: Principal): Promise<Entitlements> {
     planName: paid ? 'Individual' : 'Free',
     maxDocs: Infinity, // unlimited personal docs on both plans
     teamWorkspaces: paid,
-    maxCollaborators: paid ? Infinity : 1,
+    maxCollaboratorsPerDoc: paid ? Infinity : 2,
     versionHistory: paid,
     apiCallsPerMonth: paid ? 10000 : 500,
   }

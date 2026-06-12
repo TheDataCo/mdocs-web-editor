@@ -20,9 +20,12 @@ import { sql } from './db/index.js'
 import {
   canAccess,
   canEdit,
+  countDocCollaborators,
   createDoc,
   createLink,
+  docOwnerId,
   getDoc,
+  hasDocShare,
   listDocs,
   listSharedDocs,
   moveDoc,
@@ -89,6 +92,18 @@ export function createApi(hocuspocus: Hocuspocus) {
     return p.kind === 'user' ? p.userId : null
   }
 
+  // Per-doc collaborator cap, governed by the doc OWNER's plan (hosted only).
+  // Returns the limit if adding `candidate` would exceed it, else null (allowed).
+  async function collabCapReached(docId: string, candidate: string): Promise<number | null> {
+    if (env.BILLING !== 'clerk') return null
+    const owner = await docOwnerId(docId)
+    if (!owner) return null
+    const slug = await userPlanSlug(owner)
+    const limit = (await clerkEntitlements({ kind: 'user', userId: owner, planName: slug })).maxCollaboratorsPerDoc
+    if (!Number.isFinite(limit) || (await hasDocShare(docId, candidate))) return null
+    return (await countDocCollaborators(docId)) >= limit ? limit : null
+  }
+
   // CLI device-authorization flow (`mdocs auth login`)
   app.post('/api/cli/auth/start', async (c) => {
     const { deviceCode, userCode, expiresInSec } = await startCliAuth()
@@ -138,23 +153,13 @@ export function createApi(hocuspocus: Hocuspocus) {
       join workspace_members m on m.workspace_id = d.workspace_id and m.user_id = ${userId}
       where d.deleted_at is null
     `
-    const [collab] = await sql<{ n: number }[]>`
-      select count(distinct a.user_id)::int as n from doc_access a
-      join docs d on d.id = a.doc_id
-      where d.owner_id = ${userId} and a.user_id <> ${userId}
-    `
     const [ws] = await sql<{ n: number }[]>`
       select count(*)::int as n from workspace_members where user_id = ${userId}
     `
     return c.json({
       planName: ent.planName,
       entitlements: serializeEntitlements(ent),
-      usage: {
-        docs: docs?.n ?? 0,
-        collaborators: collab?.n ?? 0,
-        workspaces: ws?.n ?? 0,
-        apiCalls: await callsThisMonth(userId),
-      },
+      usage: { docs: docs?.n ?? 0, workspaces: ws?.n ?? 0, apiCalls: await callsThisMonth(userId) },
     })
   })
 
@@ -426,6 +431,10 @@ export function createApi(hocuspocus: Hocuspocus) {
     const id = c.req.param('id')
     const userId = requireUser(c)
     if (!userId) return c.json({ error: { code: 'permission_denied', message: 'sign in' } }, 403)
+    const cap = await collabCapReached(id, userId)
+    if (cap !== null) {
+      return c.json({ error: { code: 'plan_limit', message: `This document is at its ${cap}-collaborator limit.` } }, 402)
+    }
     const body = await c.req.json().catch(() => ({}))
     const ok = await redeemLink(id, typeof body.token === 'string' ? body.token : '', userId)
     return ok ? c.json({ ok: true }) : c.json({ error: { code: 'not_found', message: 'invalid link' } }, 404)
@@ -475,6 +484,10 @@ export function createApi(hocuspocus: Hocuspocus) {
     const role = body.role === 'viewer' ? 'viewer' : 'editor'
     const [user] = await sql<{ id: string }[]>`select id from users where lower(email) = lower(${email})`
     if (!user) return c.json({ result: { status: 'no_account' } })
+    const cap = await collabCapReached(id, user.id)
+    if (cap !== null) {
+      return c.json({ error: { code: 'plan_limit', message: `Your plan allows ${cap} collaborators per document — upgrade for more.` } }, 402)
+    }
     await sql`
       insert into doc_access (doc_id, user_id, role) values (${id}, ${user.id}, ${role})
       on conflict (doc_id, user_id) do update set role = excluded.role

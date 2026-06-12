@@ -114,6 +114,27 @@ export async function moveDoc(id: string, workspaceId: string): Promise<DocRow |
   return row
 }
 
+/** Owner of a doc (for resolving the owner's plan when capping collaborators). */
+export async function docOwnerId(docId: string): Promise<string | null> {
+  const [row] = await sql<{ owner_id: string | null }[]>`select owner_id from docs where id = ${docId}`
+  return row?.owner_id ?? null
+}
+
+/** Distinct people granted per-doc access (email shares + redeemed links). */
+export async function countDocCollaborators(docId: string): Promise<number> {
+  const [row] = await sql<{ n: number }[]>`
+    select count(distinct user_id)::int as n from doc_access where doc_id = ${docId}
+  `
+  return row?.n ?? 0
+}
+
+export async function hasDocShare(docId: string, userId: string): Promise<boolean> {
+  const [row] = await sql<{ ok: boolean }[]>`
+    select exists(select 1 from doc_access where doc_id = ${docId} and user_id = ${userId}) as ok
+  `
+  return row?.ok ?? false
+}
+
 /** Whether the principal may open (view) a doc: workspace membership or any share. */
 export async function canAccess(principal: Principal, docId: string): Promise<boolean> {
   if (principal.kind === 'service') return true

@@ -105,6 +105,61 @@ export async function softDeleteDoc(id: string): Promise<void> {
   await sql`update docs set deleted_at = now() where id = ${id}`
 }
 
+export interface TrashedDocRow {
+  id: string
+  title: string
+  workspace_id: string | null
+  workspace_name: string
+  deleted_at: string
+}
+
+/**
+ * Deleted docs visible to this user (member of the doc's workspace), within the
+ * retention window. Docs that went down with a deleted workspace are excluded —
+ * they're represented by the workspace's own trash entry.
+ */
+export async function listTrashedDocs(userId: string, days: number): Promise<TrashedDocRow[]> {
+  return sql<TrashedDocRow[]>`
+    select d.id, d.title, d.workspace_id, w.name as workspace_name, d.deleted_at
+    from docs d
+    join workspaces w on w.id = d.workspace_id and w.deleted_at is null
+    join workspace_members m on m.workspace_id = d.workspace_id and m.user_id = ${userId}
+    where d.deleted_at is not null
+      and d.deleted_at > now() - make_interval(days => ${days})
+    order by d.deleted_at desc
+  `
+}
+
+/** Can this user still see a trashed doc (member, inside the window)? Unlike
+ * the trash listing, docs inside deleted workspaces count — the CLI can view
+ * them individually. */
+export async function isTrashedDocVisible(id: string, userId: string, days: number): Promise<boolean> {
+  const [row] = await sql<{ ok: boolean }[]>`
+    select exists(
+      select 1 from docs d
+      join workspace_members m on m.workspace_id = d.workspace_id and m.user_id = ${userId}
+      where d.id = ${id} and d.deleted_at is not null
+        and d.deleted_at > now() - make_interval(days => ${days})
+    ) as ok
+  `
+  return row?.ok ?? false
+}
+
+/** Restore a deleted doc (workspace member only, inside the retention window). */
+export async function restoreDoc(id: string, userId: string, days: number): Promise<boolean> {
+  const rows = await sql<{ id: string }[]>`
+    update docs d set deleted_at = null, updated_at = now()
+    from workspaces w, workspace_members m
+    where d.id = ${id}
+      and w.id = d.workspace_id and w.deleted_at is null
+      and m.workspace_id = d.workspace_id and m.user_id = ${userId}
+      and d.deleted_at is not null
+      and d.deleted_at > now() - make_interval(days => ${days})
+    returning d.id
+  `
+  return rows.length > 0
+}
+
 export async function moveDoc(id: string, workspaceId: string): Promise<DocRow | undefined> {
   const [row] = await sql<DocRow[]>`
     update docs set workspace_id = ${workspaceId}, updated_at = now()

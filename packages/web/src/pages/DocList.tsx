@@ -8,19 +8,31 @@ import {
   createDoc,
   createWorkspace,
   deleteDoc,
+  deleteWorkspace,
   inviteMember,
   listDocs,
   listShared,
+  listTrash,
   listWorkspaces,
   moveDoc,
   renameDoc,
   renameWorkspace,
+  restoreDoc,
+  restoreWorkspace,
+  type Trash,
   type Workspace,
 } from '../api'
 import { Wordmark } from '../components/Wordmark'
 
-// Sentinel "workspace" id for the virtual Shared view.
+// Sentinel "workspace" ids for the virtual Shared and Recently deleted views.
 const SHARED = '__shared__'
+const TRASH = '__trash__'
+
+function daysLeft(deletedAt: string, retentionDays: number): string {
+  const expires = new Date(deletedAt).getTime() + retentionDays * 86400_000
+  const days = Math.ceil((expires - Date.now()) / 86400_000)
+  return days <= 0 ? 'expires today' : days === 1 ? '1 day left' : `${days} days left`
+}
 type Row = DocMeta & { ownerEmail?: string | null; ownerName?: string | null }
 
 function nextUntitled(docs: DocMeta[]): string {
@@ -34,10 +46,13 @@ export function DocListPage() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [docs, setDocs] = useState<Row[] | null>(null)
+  const [trash, setTrash] = useState<Trash | null>(null)
   const [query, setQuery] = useState('')
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [renamingDoc, setRenamingDoc] = useState<string | null>(null)
   const [renamingWs, setRenamingWs] = useState<string | null>(null)
+  const [menuWs, setMenuWs] = useState<string | null>(null)
+  const [confirmDeleteWs, setConfirmDeleteWs] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteMsg, setInviteMsg] = useState<string | null>(null)
@@ -62,6 +77,7 @@ export function DocListPage() {
   }
 
   const isShared = activeId === SHARED
+  const isTrash = activeId === TRASH
   const active = workspaces.find((w) => w.id === activeId) ?? null
   const filtered = (docs ?? []).filter((d) => d.title.toLowerCase().includes(query.toLowerCase()))
 
@@ -77,6 +93,11 @@ export function DocListPage() {
 
   useEffect(() => {
     if (!activeId) return
+    if (activeId === TRASH) {
+      setTrash(null)
+      listTrash().then(setTrash, (e) => setError(String(e)))
+      return
+    }
     setDocs(null)
     const load = activeId === SHARED ? listShared() : listDocs(activeId)
     load.then(setDocs, (e) => setError(String(e)))
@@ -86,6 +107,8 @@ export function DocListPage() {
     const close = () => {
       setMenuFor(null)
       setConfirmDelete(null)
+      setMenuWs(null)
+      setConfirmDeleteWs(null)
     }
     window.addEventListener('click', close)
     return () => window.removeEventListener('click', close)
@@ -128,6 +151,26 @@ export function DocListPage() {
     deleteDoc(doc.id).catch(() => listDocs(activeId!).then(setDocs))
   }
 
+  function onDeleteWorkspace(ws: Workspace) {
+    setMenuWs(null)
+    setConfirmDeleteWs(null)
+    setWorkspaces((cur) => cur.filter((w) => w.id !== ws.id))
+    if (activeId === ws.id) setActiveId(workspaces.find((w) => w.id !== ws.id)?.id ?? null)
+    deleteWorkspace(ws.id).catch(() => listWorkspaces().then(setWorkspaces))
+  }
+
+  function onRestoreDoc(id: string) {
+    setTrash((t) => (t ? { ...t, docs: t.docs.filter((d) => d.id !== id) } : t))
+    restoreDoc(id).catch(() => listTrash().then(setTrash))
+  }
+
+  function onRestoreWorkspace(id: string) {
+    setTrash((t) => (t ? { ...t, workspaces: t.workspaces.filter((w) => w.id !== id) } : t))
+    restoreWorkspace(id)
+      .then(() => listWorkspaces().then(setWorkspaces))
+      .catch(() => listTrash().then(setTrash))
+  }
+
   return (
     <>
       <div className="topbar">
@@ -152,11 +195,10 @@ export function DocListPage() {
                 }}
               />
             ) : (
-              <button
+              <div
                 key={w.id}
                 className={`ws-item ${w.id === activeId ? 'active' : ''} ${dropWs === w.id ? 'drop' : ''}`}
-                onClick={() => setActiveId(w.id)}
-                onDoubleClick={() => setRenamingWs(w.id)}
+                onClick={() => (w.id === activeId ? setRenamingWs(w.id) : setActiveId(w.id))}
                 onDragOver={(e) => {
                   if (dragId) {
                     e.preventDefault()
@@ -165,11 +207,46 @@ export function DocListPage() {
                 }}
                 onDragLeave={() => setDropWs((d) => (d === w.id ? null : d))}
                 onDrop={() => onDropToWorkspace(w.id)}
-                title="Double-click to rename"
+                title={w.id === activeId ? 'Click to rename' : w.name}
               >
                 <span className="ws-glyph">•</span>
-                {w.name}
-              </button>
+                <span className="ws-name">{w.name}</span>
+                <div className="row-menu" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className="kebab"
+                    onClick={() => {
+                      setMenuWs(menuWs === w.id ? null : w.id)
+                      setConfirmDeleteWs(null)
+                    }}
+                    aria-label="Workspace options"
+                  >
+                    ⋯
+                  </button>
+                  {menuWs === w.id && (
+                    <div className="menu">
+                      <button
+                        onClick={() => {
+                          setMenuWs(null)
+                          setRenamingWs(w.id)
+                        }}
+                      >
+                        Rename
+                      </button>
+                      {w.type === 'team' && w.role === 'owner' && (
+                        confirmDeleteWs === w.id ? (
+                          <button className="danger" onClick={() => onDeleteWorkspace(w)}>
+                            Confirm delete
+                          </button>
+                        ) : (
+                          <button className="danger" onClick={() => setConfirmDeleteWs(w.id)}>
+                            Delete
+                          </button>
+                        )
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             ),
           )}
           <button
@@ -180,6 +257,14 @@ export function DocListPage() {
             <span className="ws-glyph">⬡</span>
             Shared
           </button>
+          <button
+            className={`ws-item ${isTrash ? 'active' : ''}`}
+            onClick={() => setActiveId(TRASH)}
+            title="Deleted documents and workspaces you can still restore"
+          >
+            <span className="ws-glyph">↺</span>
+            Recently deleted
+          </button>
           <button className="ws-item new" onClick={onNewWorkspace}>
             + New workspace
           </button>
@@ -188,14 +273,14 @@ export function DocListPage() {
         <main className="content">
           {error && <p className="error">{error}</p>}
           <div className="content-head">
-            <h2>{isShared ? 'Shared' : (active?.name ?? 'Documents')}</h2>
+            <h2>{isTrash ? 'Recently deleted' : isShared ? 'Shared' : (active?.name ?? 'Documents')}</h2>
             <div className="content-actions">
               {active?.type === 'team' && !isShared && (
                 <button className="btn" onClick={() => { setInviteOpen((o) => !o); setInviteMsg(null) }}>
                   Invite
                 </button>
               )}
-              {!isShared && (
+              {!isShared && !isTrash && (
                 <button className="btn primary" onClick={onCreate} disabled={!activeId}>
                   New doc
                 </button>
@@ -222,6 +307,53 @@ export function DocListPage() {
             </form>
           )}
 
+          {isTrash && (
+            <div className="doclist compact">
+              {trash === null && !error && <p className="muted">Loading…</p>}
+              {trash && (
+                <>
+                  <p className="muted trash-note">
+                    Deleted items can be restored for {trash.retentionDays} days.
+                    {BILLING_ON && trash.retentionDays < 90 && (
+                      <>
+                        {' '}
+                        <a href="/account?upgrade=trash">Upgrade</a> to keep them for 90 days.
+                      </>
+                    )}
+                  </p>
+                  {trash.workspaces.length === 0 && trash.docs.length === 0 && (
+                    <p className="muted">Nothing in the trash.</p>
+                  )}
+                  {trash.workspaces.map((w) => (
+                    <div key={w.id} className="row trash-row">
+                      <span className="ws-glyph">•</span>
+                      <span className="doclist-title">{w.name}</span>
+                      <span className="muted">
+                        Workspace · {w.docCount} {w.docCount === 1 ? 'doc' : 'docs'}
+                      </span>
+                      <span className="muted row-date">{daysLeft(w.deletedAt, trash.retentionDays)}</span>
+                      <button className="btn" onClick={() => onRestoreWorkspace(w.id)}>
+                        Restore
+                      </button>
+                    </div>
+                  ))}
+                  {trash.docs.map((d) => (
+                    <div key={d.id} className="row trash-row">
+                      <span className="ws-glyph">¶</span>
+                      <span className="doclist-title">{d.title || 'Untitled'}</span>
+                      <span className="muted">{d.workspaceName}</span>
+                      <span className="muted row-date">{daysLeft(d.deletedAt, trash.retentionDays)}</span>
+                      <button className="btn" onClick={() => onRestoreDoc(d.id)}>
+                        Restore
+                      </button>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+
+          {!isTrash && (
           <input
             className="search"
             type="search"
@@ -229,7 +361,9 @@ export function DocListPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
+          )}
 
+          {!isTrash && (
           <div className="doclist compact">
             {docs === null && !error && <p className="muted">Loading…</p>}
             {docs && filtered.length === 0 && (
@@ -302,6 +436,7 @@ export function DocListPage() {
               ),
             )}
           </div>
+          )}
         </main>
       </div>
     </>

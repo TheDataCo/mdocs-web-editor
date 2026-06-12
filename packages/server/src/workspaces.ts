@@ -10,7 +10,9 @@ export interface WorkspaceRow {
 /** Every user has exactly one personal workspace; create it on demand. */
 export async function ensurePersonalWorkspace(userId: string): Promise<string> {
   const [existing] = await sql<{ id: string }[]>`
-    select id from workspaces where type = 'personal' and owner_id = ${userId} limit 1
+    select id from workspaces
+    where type = 'personal' and owner_id = ${userId} and deleted_at is null
+    limit 1
   `
   if (existing) return existing.id
 
@@ -51,6 +53,7 @@ export async function listWorkspaces(userId: string): Promise<WorkspaceRow[]> {
     select w.id, w.type, w.name, m.role
     from workspaces w
     join workspace_members m on m.workspace_id = w.id and m.user_id = ${userId}
+    where w.deleted_at is null
     order by (w.type = 'personal') desc, w.name asc
   `
 }
@@ -70,6 +73,66 @@ export async function createTeamWorkspace(userId: string, name: string): Promise
 
 export async function renameWorkspace(workspaceId: string, name: string): Promise<void> {
   await sql`update workspaces set name = ${name}, updated_at = now() where id = ${workspaceId}`
+}
+
+export async function workspaceType(workspaceId: string): Promise<string | null> {
+  const [row] = await sql<{ type: string }[]>`
+    select type from workspaces where id = ${workspaceId} and deleted_at is null
+  `
+  return row?.type ?? null
+}
+
+/** Soft-delete a workspace and everything in it (docs stay recoverable). now()
+ * is constant within the transaction, so the docs share the workspace's exact
+ * deleted_at — that's how restoreWorkspace knows which docs went down with it. */
+export async function softDeleteWorkspace(workspaceId: string): Promise<void> {
+  await sql.begin(async (tx) => {
+    await tx`
+      update docs set deleted_at = now(), updated_at = now()
+      where workspace_id = ${workspaceId} and deleted_at is null
+    `
+    await tx`update workspaces set deleted_at = now(), updated_at = now() where id = ${workspaceId}`
+  })
+}
+
+export interface TrashedWorkspaceRow {
+  id: string
+  name: string
+  deleted_at: string
+  doc_count: number
+}
+
+/** Deleted workspaces this user owns, within their plan's retention window. */
+export async function listTrashedWorkspaces(userId: string, days: number): Promise<TrashedWorkspaceRow[]> {
+  return sql<TrashedWorkspaceRow[]>`
+    select w.id, w.name, w.deleted_at,
+      (select count(*)::int from docs d
+       where d.workspace_id = w.id and d.deleted_at = w.deleted_at) as doc_count
+    from workspaces w
+    join workspace_members m on m.workspace_id = w.id and m.user_id = ${userId} and m.role = 'owner'
+    where w.deleted_at is not null
+      and w.deleted_at > now() - make_interval(days => ${days})
+    order by w.deleted_at desc
+  `
+}
+
+/** Restore a workspace and the docs that were deleted with it. */
+export async function restoreWorkspace(workspaceId: string, days: number): Promise<boolean> {
+  return sql.begin(async (tx) => {
+    const [ws] = await tx<{ deleted_at: string }[]>`
+      select deleted_at from workspaces
+      where id = ${workspaceId} and deleted_at is not null
+        and deleted_at > now() - make_interval(days => ${days})
+      for update
+    `
+    if (!ws) return false
+    await tx`
+      update docs set deleted_at = null, updated_at = now()
+      where workspace_id = ${workspaceId} and deleted_at = ${ws.deleted_at}
+    `
+    await tx`update workspaces set deleted_at = null, updated_at = now() where id = ${workspaceId}`
+    return true
+  })
 }
 
 export async function isMember(userId: string, workspaceId: string): Promise<boolean> {

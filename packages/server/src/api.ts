@@ -26,11 +26,14 @@ import {
   docOwnerId,
   getDoc,
   hasDocShare,
+  isTrashedDocVisible,
   listDocs,
   listSharedDocs,
+  listTrashedDocs,
   moveDoc,
   redeemLink,
   renameDoc,
+  restoreDoc,
   softDeleteDoc,
 } from './docs.js'
 import {
@@ -39,9 +42,13 @@ import {
   inviteToWorkspace,
   isMember,
   listMembers,
+  listTrashedWorkspaces,
   listWorkspaces,
   memberRole,
   renameWorkspace,
+  restoreWorkspace,
+  softDeleteWorkspace,
+  workspaceType,
 } from './workspaces.js'
 
 // The web build, when present (prod), is served from this same origin so the
@@ -154,7 +161,9 @@ export function createApi(hocuspocus: Hocuspocus) {
       where d.deleted_at is null
     `
     const [ws] = await sql<{ n: number }[]>`
-      select count(*)::int as n from workspace_members where user_id = ${userId}
+      select count(*)::int as n from workspace_members m
+      join workspaces w on w.id = m.workspace_id and w.deleted_at is null
+      where m.user_id = ${userId}
     `
     return c.json({
       planName: ent.planName,
@@ -353,6 +362,24 @@ export function createApi(hocuspocus: Hocuspocus) {
     return c.json({ ok: true })
   })
 
+  // Deleting a workspace soft-deletes it and its docs (recoverable server-side).
+  // Owners only; the personal workspace can't be deleted.
+  app.delete('/api/workspaces/:id', async (c) => {
+    const userId = requireUser(c)
+    const wsId = c.req.param('id')
+    const role = await (userId ? memberRole(userId, wsId) : null)
+    if (!userId || role !== 'owner') {
+      return c.json({ error: { code: 'permission_denied', message: 'owners only' } }, 403)
+    }
+    const type = await workspaceType(wsId)
+    if (!type) return c.json({ error: { code: 'not_found', message: 'no such workspace' } }, 404)
+    if (type === 'personal') {
+      return c.json({ error: { code: 'invalid', message: 'the personal workspace cannot be deleted' } }, 400)
+    }
+    await softDeleteWorkspace(wsId)
+    return c.json({ ok: true })
+  })
+
   app.get('/api/workspaces/:id/members', async (c) => {
     const userId = requireUser(c)
     if (!userId || !(await isMember(userId, c.req.param('id')))) {
@@ -373,6 +400,64 @@ export function createApi(hocuspocus: Hocuspocus) {
     if (!email) return c.json({ error: { code: 'invalid', message: 'email required' } }, 400)
     const inviteRole = body.role === 'admin' ? 'admin' : 'member'
     return c.json({ result: await inviteToWorkspace(wsId, email, inviteRole, userId) }, 201)
+  })
+
+  // The caller's trash retention window. Browser JWTs carry the plan; dd_
+  // tokens don't, so resolve the plan from the subscription store (same as
+  // API-call metering does).
+  async function trashDays(c: { get: (k: 'principal') => Principal }): Promise<number> {
+    const p = c.get('principal')
+    if (p.kind === 'user' && p.planName === undefined && env.BILLING === 'clerk') {
+      const slug = await userPlanSlug(p.userId)
+      return (await clerkEntitlements({ kind: 'user', userId: p.userId, planName: slug })).trashRetentionDays
+    }
+    return (await getEntitlements(p)).trashRetentionDays
+  }
+
+  // Recently deleted: docs + workspaces inside the caller's plan retention
+  // window (Free 15 days, Individual 90; self-host 90). Soft-deleted rows are
+  // kept beyond the window — the window only gates visibility/restore.
+  app.get('/api/trash', async (c) => {
+    const userId = requireUser(c)
+    if (!userId) return c.json({ docs: [], workspaces: [], retentionDays: 0 })
+    const days = await trashDays(c)
+    const [docs, workspaces] = await Promise.all([
+      listTrashedDocs(userId, days),
+      listTrashedWorkspaces(userId, days),
+    ])
+    return c.json({ docs, workspaces, retentionDays: days })
+  })
+
+  // Read a trashed doc's markdown (CLI `mdocs trash view`).
+  app.get('/api/trash/docs/:id/content', async (c) => {
+    const userId = requireUser(c)
+    if (!userId) return c.json({ error: { code: 'permission_denied', message: 'sign in' } }, 403)
+    const id = c.req.param('id')
+    if (!(await isTrashedDocVisible(id, userId, await trashDays(c)))) {
+      return c.json({ error: { code: 'not_found', message: 'no such doc in trash' } }, 404)
+    }
+    const ydoc = await loadDocState(id)
+    const text = ydoc.getText(DOC_TEXT_FIELD).toString()
+    ydoc.destroy()
+    return c.text(text)
+  })
+
+  app.post('/api/docs/:id/restore', async (c) => {
+    const userId = requireUser(c)
+    if (!userId) return c.json({ error: { code: 'permission_denied', message: 'sign in' } }, 403)
+    const ok = await restoreDoc(c.req.param('id'), userId, await trashDays(c))
+    return ok ? c.json({ ok: true }) : c.json({ error: { code: 'not_found', message: 'not restorable' } }, 404)
+  })
+
+  app.post('/api/workspaces/:id/restore', async (c) => {
+    const userId = requireUser(c)
+    const wsId = c.req.param('id')
+    const role = await (userId ? memberRole(userId, wsId) : null)
+    if (!userId || role !== 'owner') {
+      return c.json({ error: { code: 'permission_denied', message: 'owners only' } }, 403)
+    }
+    const ok = await restoreWorkspace(wsId, await trashDays(c))
+    return ok ? c.json({ ok: true }) : c.json({ error: { code: 'not_found', message: 'not restorable' } }, 404)
   })
 
   // Docs

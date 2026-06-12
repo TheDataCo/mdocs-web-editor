@@ -11,6 +11,7 @@ export interface Entitlements {
   maxCollaboratorsPerDoc: number // people who can be granted access to a single doc (email + link)
   versionHistory: boolean // history + revert
   apiCallsPerMonth: number // metered by the cloud overlay; OSS does not meter
+  trashRetentionDays: number // window for seeing/restoring deleted docs & workspaces
 }
 
 export const UNLIMITED: Entitlements = {
@@ -20,6 +21,7 @@ export const UNLIMITED: Entitlements = {
   maxCollaboratorsPerDoc: Infinity,
   versionHistory: true,
   apiCallsPerMonth: Infinity,
+  trashRetentionDays: 90,
 }
 
 /** JSON can't carry Infinity; send unlimited as null so the client renders "∞". */
@@ -64,6 +66,7 @@ export async function clerkEntitlements(p: Principal): Promise<Entitlements> {
     maxCollaboratorsPerDoc: paid ? Infinity : 2,
     versionHistory: paid,
     apiCallsPerMonth: paid ? 10000 : 500,
+    trashRetentionDays: paid ? 90 : 15,
   }
 }
 

@@ -61,6 +61,57 @@ export async function renameWorkspace(id: string, name: string): Promise<void> {
   await request(`/api/workspaces/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
 }
 
+export async function deleteWorkspace(id: string): Promise<void> {
+  await request(`/api/workspaces/${id}`, { method: 'DELETE' })
+}
+
+export interface TrashedDoc {
+  id: string
+  title: string
+  workspaceName: string
+  deletedAt: string
+}
+
+export interface TrashedWorkspace {
+  id: string
+  name: string
+  docCount: number
+  deletedAt: string
+}
+
+export interface Trash {
+  docs: TrashedDoc[]
+  workspaces: TrashedWorkspace[]
+  retentionDays: number
+}
+
+export async function listTrash(): Promise<Trash> {
+  const { docs, workspaces, retentionDays } = await request('/api/trash')
+  return {
+    docs: docs.map((d: { id: string; title: string; workspace_name: string; deleted_at: string }) => ({
+      id: d.id,
+      title: d.title,
+      workspaceName: d.workspace_name,
+      deletedAt: d.deleted_at,
+    })),
+    workspaces: workspaces.map((w: { id: string; name: string; doc_count: number; deleted_at: string }) => ({
+      id: w.id,
+      name: w.name,
+      docCount: w.doc_count,
+      deletedAt: w.deleted_at,
+    })),
+    retentionDays,
+  }
+}
+
+export async function restoreDoc(id: string): Promise<void> {
+  await request(`/api/docs/${id}/restore`, { method: 'POST' })
+}
+
+export async function restoreWorkspace(id: string): Promise<void> {
+  await request(`/api/workspaces/${id}/restore`, { method: 'POST' })
+}
+
 export async function listMembers(workspaceId: string): Promise<Member[]> {
   const { members } = await request(`/api/workspaces/${workspaceId}/members`)
   return members

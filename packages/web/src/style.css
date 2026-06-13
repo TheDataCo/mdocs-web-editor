@@ -562,6 +562,48 @@ body {
   margin-top: 6px;
 }
 
+/* Click-to-copy CLI install command in the doc-list topbar. */
+.cli-install {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--muted);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.cli-install:hover {
+  border-color: var(--ring);
+}
+
+.cli-install svg,
+.cli-check {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
+.cli-check {
+  font-size: 12px;
+  line-height: 1;
+  color: oklch(0.55 0.13 150);
+}
+
+.gh-link {
+  display: inline-flex;
+  align-items: center;
+}
+
+@media (max-width: 760px) {
+  .cli-install {
+    display: none;
+  }
+}
+
 .ws-glyph {
   font-size: 12px;
   color: var(--muted-foreground);

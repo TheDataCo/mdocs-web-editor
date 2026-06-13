@@ -17,6 +17,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
       - run: pnpm -r typecheck
       - run: pnpm --filter @mdocs/web build
         env:
@@ -42,7 +43,6 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mdocs_ci
       CLERK_SECRET_KEY: sk_test_ci_dummy # server boot needs one; sync-check auths with COLLAB_TOKEN
-      COLLAB_TOKEN: ci-token
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -51,6 +51,9 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # env.ts requires a strong service token — mint an ephemeral one per run.
+      - name: Generate CI service token
+        run: echo "COLLAB_TOKEN=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
       - name: Apply schema
         run: pnpm --filter @mdocs/server exec drizzle-kit push --force
       - name: Boot server and run sync-check

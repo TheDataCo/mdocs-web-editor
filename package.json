@@ -7,9 +7,11 @@
     "dev:server": "pnpm --filter @mdocs/server dev",
     "dev:web": "pnpm --filter @mdocs/web dev",
     "db:push": "pnpm --filter @mdocs/server db:push",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "lint": "biome lint ."
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.0",
     "typescript": "^6.0.3"
   }
 }

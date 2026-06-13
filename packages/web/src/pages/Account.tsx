@@ -113,8 +113,8 @@ export function AccountPage() {
           {activity && activity.length > 0 && (
             <table className="activity">
               <tbody>
-                {activity.map((a, i) => (
-                  <tr key={i}>
+                {activity.map((a) => (
+                  <tr key={`${a.created_at}:${a.method}:${a.path}:${a.status}`}>
                     <td className="act-method">{a.method}</td>
                     <td className="act-path">{a.path}</td>
                     <td className={`act-status ${a.status >= 400 ? 'err' : ''}`}>{a.status}</td>

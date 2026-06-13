@@ -1,7 +1,7 @@
 import { useAuth } from '@clerk/clerk-react'
 import { UserMenu } from '../components/UserMenu'
 import type { DocMeta } from '@mdocs/core'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BILLING_ON } from '../config'
 import {
@@ -176,6 +176,15 @@ export function DocListPage() {
       <div className="topbar">
         <Wordmark />
         <span className="spacer" />
+        <a
+          className="btn"
+          href="https://github.com/TheDataCo/mdocs"
+          target="_blank"
+          rel="noreferrer"
+          title="Install the mdocs CLI — pull, edit, and push docs from your terminal or agent"
+        >
+          CLI
+        </a>
         <UserMenu />
       </div>
       <div className="layout">
@@ -268,16 +277,6 @@ export function DocListPage() {
           <button className="ws-item new" onClick={onNewWorkspace}>
             + New workspace
           </button>
-          <a
-            className="ws-item new"
-            href="https://github.com/TheDataCo/mdocs"
-            target="_blank"
-            rel="noreferrer"
-            title="Install the mdocs CLI — pull, edit, and push docs from your terminal or agent"
-          >
-            <span className="ws-glyph">⌨</span>
-            Get the CLI
-          </a>
         </aside>
 
         <main className="content">

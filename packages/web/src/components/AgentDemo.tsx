@@ -82,7 +82,7 @@ export function AgentDemo() {
                 </p>
               ),
             )}
-            {(!last || last.kind !== 'cmd') && (
+            {(last?.kind !== 'cmd') && (
               <p className="demo-line cmd">
                 <span className="demo-prompt">$ </span>
                 <span className="demo-cursor" />

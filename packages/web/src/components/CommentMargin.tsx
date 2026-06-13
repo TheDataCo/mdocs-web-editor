@@ -219,10 +219,16 @@ export function CommentMargin({
       }
       if (d.caretRangeFromPoint) {
         const r = d.caretRangeFromPoint(e.clientX, e.clientY)
-        if (r) (node = r.startContainer), (off = r.startOffset)
+        if (r) {
+          node = r.startContainer
+          off = r.startOffset
+        }
       } else if (d.caretPositionFromPoint) {
         const p = d.caretPositionFromPoint(e.clientX, e.clientY)
-        if (p) (node = p.offsetNode), (off = p.offset)
+        if (p) {
+          node = p.offsetNode
+          off = p.offset
+        }
       }
       let hit: string | null = null
       if (node) {
@@ -368,7 +374,7 @@ export function CommentMargin({
           {pending && (
             <div
               className="comment-card composer active"
-              style={{ top: tops['__draft'] ?? pending.desiredTop }}
+              style={{ top: tops.__draft ?? pending.desiredTop }}
               ref={cardRef('__draft')}
             >
               <div className="comment-head">

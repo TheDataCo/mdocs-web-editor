@@ -168,8 +168,21 @@ export function EditorPage() {
     const view = new EditorView({
       extensions: [
         keymap.of([
-          { key: 'Mod-e', run: () => (toggleRef.current(), true) },
-          { key: 'Mod-p', preventDefault: true, run: () => (previewToggleRef.current(), true) },
+          {
+            key: 'Mod-e',
+            run: () => {
+              toggleRef.current()
+              return true
+            },
+          },
+          {
+            key: 'Mod-p',
+            preventDefault: true,
+            run: () => {
+              previewToggleRef.current()
+              return true
+            },
+          },
         ]),
         keymap.of(yUndoManagerKeymap),
         keymap.of([indentWithTab]), // Tab indents (4 spaces) — enables nested lists
@@ -316,8 +329,8 @@ export function EditorPage() {
           {canEdit === false && <span className="badge">View only</span>}
           <span className="spacer" />
           <div className="peers">
-            {peers.map((p, i) => (
-              <span key={i} className="avatar" style={{ background: p.color }} title={p.name}>
+            {peers.map((p) => (
+              <span key={`${p.name}|${p.color}`} className="avatar" style={{ background: p.color }} title={p.name}>
                 {p.name.charAt(0)}
               </span>
             ))}

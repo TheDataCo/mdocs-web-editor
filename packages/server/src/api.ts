@@ -566,7 +566,7 @@ export function createApi(hocuspocus: Hocuspocus) {
       return c.json({ error: { code: 'permission_denied', message: 'no access' } }, 403)
     }
     const body = await c.req.json().catch(() => ({}))
-    let doc
+    let doc: Awaited<ReturnType<typeof renameDoc>>
     if (typeof body.title === 'string' && body.title.trim()) {
       doc = await renameDoc(id, body.title.trim())
     }

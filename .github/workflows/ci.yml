@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Typecheck every package and make sure the web bundle builds.
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r typecheck
+      - run: pnpm --filter @mdocs/web build
+        env:
+          VITE_CLERK_PUBLISHABLE_KEY: pk_test_ci_placeholder
+
+  # Integration: real Postgres, real server, real websocket sync.
+  sync-check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: mdocs_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/mdocs_ci
+      CLERK_SECRET_KEY: sk_test_ci_dummy # server boot needs one; sync-check auths with COLLAB_TOKEN
+      COLLAB_TOKEN: ci-token
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply schema
+        run: pnpm --filter @mdocs/server exec drizzle-kit push --force
+      - name: Boot server and run sync-check
+        run: |
+          pnpm --filter @mdocs/server start &
+          for i in $(seq 1 30); do
+            curl -fs http://localhost:3001/healthz >/dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -fs http://localhost:3001/healthz
+          SYNC_URL=ws://localhost:3001 pnpm --filter @mdocs/server sync-check

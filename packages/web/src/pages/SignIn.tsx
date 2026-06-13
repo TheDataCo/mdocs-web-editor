@@ -12,7 +12,7 @@ function AuthShell({ children }: { children: React.ReactNode }) {
             <span className="keycap">m</span>
             <div className="wordmark-text">
               <span className="name">mdocs</span>
-              <span className="tagline">Docs for Markdown</span>
+              <span className="tagline">by The Data Company</span>
             </div>
           </div>
           <h1>Work with your agent.</h1>

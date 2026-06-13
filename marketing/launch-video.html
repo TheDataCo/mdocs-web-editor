@@ -1,0 +1,623 @@
+<!doctype html>
+<!--
+  mdocs launch video loop — open in a browser, fullscreen (F), and screen-record.
+  Designed at 1600×900 (16:9), scales to any window. Loop length ≈ 22s.
+  Keys: space = pause/resume · r = restart · f = fullscreen
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>mdocs — launch loop</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --muted: #6f6f6f;
+    --border: #e6e4e1;
+    --soft: #f6f5f3;
+    --gold: #e0a458;
+    --term-bg: #0d0c0a;
+    --claude: #7c5cff;
+    --peer: #0d9488;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; }
+  body.frozen *, body.frozen *::before, body.frozen *::after {
+    transition: none !important; animation: none !important;
+  }
+  html, body { height: 100%; background: #0a0908; overflow: hidden; cursor: none; }
+  body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+
+  #stage {
+    position: fixed; left: 50%; top: 50%;
+    width: 1600px; height: 900px;
+    transform-origin: center;
+    background:
+      radial-gradient(900px 600px at 30% 20%, rgba(255,255,255,0.045), transparent 60%),
+      #0a0908;
+  }
+
+  /* ---------- square layout (?layout=square) for phone / X 1:1 ---------- */
+  body.square #stage { width: 1080px; height: 1080px; }
+  body.square .sidebar { display: none; }
+  body.square .browser { left: 24px; top: 64px; width: 1032px; height: 620px; }
+  body.square .term { right: 36px; bottom: 104px; }
+  body.square .caption { bottom: 16px; font-size: 22px; max-width: 1020px; }
+  body.square .intro-line { width: 940px; font-size: 30px; }
+  body.square .intro-line.hello { font-size: 52px; }
+  body.square .app-body.viewmode .pane-prev { padding: 28px 64px; }
+
+  /* ---------- intro story ---------- */
+  .intro {
+    position: absolute; inset: 0; background: #0a0908; z-index: 5;
+    opacity: 1; transition: opacity 0.6s ease; pointer-events: none;
+  }
+  .intro.off { opacity: 0; }
+  .intro-line {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -46%);
+    width: 980px; text-align: center;
+    font-size: 34px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.35;
+    color: rgba(255,255,255,0.92);
+    opacity: 0; transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .intro-line.hello { font-size: 58px; }
+  .intro-line.on { opacity: 1; transform: translate(-50%, -50%); }
+  .intro-line .dim { color: rgba(255,255,255,0.45); font-weight: 500; }
+  .intro-line b { color: #fff; }
+
+  /* ---------- browser window ---------- */
+  .browser {
+    position: absolute; left: 120px; top: 70px;
+    width: 1180px; height: 700px;
+    border-radius: 14px; overflow: hidden;
+    background: var(--bg); color: var(--fg);
+    box-shadow: 0 30px 90px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08);
+    opacity: 0; transform: translateY(14px) scale(0.985);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  .browser.on { opacity: 1; transform: none; }
+
+  .chrome {
+    height: 40px; display: flex; align-items: center; gap: 8px;
+    padding: 0 14px; background: #ececea; border-bottom: 1px solid #dddbd8;
+  }
+  .dot { width: 11px; height: 11px; border-radius: 50%; background: #d2d0cc; }
+  .urlbar {
+    margin-left: 14px; flex: 0 0 420px; height: 24px; border-radius: 7px;
+    background: #fff; border: 1px solid #dddbd8;
+    display: flex; align-items: center; padding: 0 10px;
+    font-size: 11.5px; color: #5a5a5a; letter-spacing: 0.01em;
+  }
+  .urlbar .lock { opacity: 0.5; margin-right: 6px; font-size: 10px; }
+
+  /* app topbar */
+  .topbar {
+    height: 52px; display: flex; align-items: center; gap: 14px;
+    padding: 0 16px; border-bottom: 1px solid var(--border); background: #fff;
+  }
+  .keycap {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 6px;
+    background: var(--fg); color: #fff; font-weight: 700; font-size: 13px;
+    box-shadow: 0 1.5px 0 rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.18);
+  }
+  .wordmark { display: flex; align-items: center; gap: 8px; }
+  .wordmark .name { font-size: 14.5px; font-weight: 600; letter-spacing: -0.02em; }
+  .tb-divider { width: 1px; height: 22px; background: var(--border); }
+  .doc-title { font-size: 13.5px; font-weight: 600; }
+  .doc-saved { font-size: 11.5px; color: var(--muted); }
+  .tb-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .avatars { display: flex; }
+  .avatar {
+    width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10.5px; font-weight: 600; color: #fff; margin-left: -6px;
+  }
+  .avatar:first-child { margin-left: 0; }
+  .avatar.you { background: #1a1a1a; }
+  .avatar.peer { background: var(--peer); }
+  .avatar.claude {
+    background: var(--claude);
+    opacity: 0; transform: scale(0.4);
+    transition: opacity 0.35s ease, transform 0.35s cubic-bezier(.34,1.56,.64,1);
+  }
+  .avatar.claude.on { opacity: 1; transform: scale(1); }
+  .btn {
+    height: 26px; padding: 0 11px; border-radius: 7px; font-size: 12px; font-weight: 500;
+    display: inline-flex; align-items: center; border: 1px solid var(--border);
+    background: linear-gradient(#fff, #f3f2f0); color: var(--fg);
+  }
+  .btn.dark { background: var(--fg); color: #fff; border-color: var(--fg); }
+
+  .mode-toggle {
+    display: inline-flex; align-items: center; padding: 2px;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--soft);
+    position: relative;
+  }
+  .mode-toggle .seg {
+    height: 22px; padding: 0 12px; border-radius: 6px; font-size: 11.5px; font-weight: 500;
+    display: inline-flex; align-items: center; color: var(--muted);
+    transition: background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+  }
+  .mode-toggle .seg.active { background: #fff; color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+  .click-ring {
+    position: absolute; right: 12px; top: 50%; width: 30px; height: 30px;
+    margin: -15px -15px 0 0; border-radius: 50%; border: 2px solid var(--claude);
+    opacity: 0; pointer-events: none;
+  }
+  .click-ring.go { animation: ring 0.6s ease-out 1; }
+  @keyframes ring { 0% { opacity: 0.9; transform: scale(0.3); } 100% { opacity: 0; transform: scale(1.4); } }
+
+  /* view mode: source pane collapses, preview becomes the doc */
+  .pane-src { transition: width 0.55s cubic-bezier(.22,1,.36,1), padding 0.55s ease, opacity 0.35s ease, border-color 0.55s ease; }
+  .app-body.viewmode .pane-src { width: 0; padding: 22px 0; opacity: 0; border-color: transparent; }
+  .pane-prev { transition: padding 0.55s ease; }
+  .app-body.viewmode .pane-prev { padding: 28px 88px; }
+
+  /* app body */
+  .app-body { display: flex; height: calc(100% - 92px); }
+  .sidebar {
+    width: 190px; border-right: 1px solid var(--border); background: var(--soft);
+    padding: 14px 10px; font-size: 12.5px;
+  }
+  .ws-name { font-weight: 600; font-size: 12px; padding: 4px 8px 10px; display: flex; align-items: center; gap: 6px; }
+  .ws-badge { width: 16px; height: 16px; border-radius: 4px; background: #d8d6d2; display: inline-block; }
+  .doc-item { padding: 5px 8px; border-radius: 6px; color: #4a4a4a; display: flex; gap: 7px; align-items: center; }
+  .doc-item .fico { opacity: 0.45; font-size: 11px; }
+  .doc-item.active { background: #e9e7e3; color: var(--fg); font-weight: 500; }
+
+  .pane-src {
+    width: 360px; border-right: 1px solid var(--border);
+    padding: 22px 20px; font-family: var(--font-mono); font-size: 12.5px;
+    line-height: 1.75; color: #3c3c3c; white-space: pre-wrap; overflow: hidden;
+  }
+  .pane-src .h { color: var(--fg); font-weight: 500; }
+  .pane-prev { flex: 1; padding: 24px 28px; overflow: hidden; }
+  .pane-prev h1 { font-size: 22px; letter-spacing: -0.02em; margin-bottom: 14px; }
+  .pane-prev h2 { font-size: 15.5px; letter-spacing: -0.01em; margin: 18px 0 8px; }
+  .pane-prev ul { padding-left: 20px; }
+  .pane-prev li, .pane-prev p { font-size: 13.5px; line-height: 1.65; color: #2e2e2e; margin: 3px 0; }
+  .pane-prev p { margin: 8px 0; }
+
+  .caret {
+    display: inline-block; width: 6px; height: 1.05em; vertical-align: text-bottom;
+    background: rgba(0,0,0,0.75); animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* agent section landing */
+  .agent-block { opacity: 0; transition: opacity 0.5s ease; position: relative; }
+  .agent-block.on { opacity: 1; }
+  .agent-block.on .flashable { animation: flash 1.4s ease 1; }
+  @keyframes flash { 0% { background: rgba(224,164,88,0.0); } 18% { background: rgba(224,164,88,0.28); } 100% { background: transparent; } }
+  .claude-chip {
+    position: absolute; top: 8px; right: 6px;
+    background: var(--claude); color: #fff; font-family: var(--font-sans);
+    font-size: 9.5px; font-weight: 600; padding: 2px 7px; border-radius: 4px;
+    opacity: 0; transition: opacity 0.3s ease;
+  }
+  .agent-block.on .claude-chip { opacity: 1; }
+
+  .hl { border-radius: 2px; transition: background 0.4s ease; }
+  .hl.on { background: rgba(250, 210, 90, 0.45); }
+
+  /* comments margin */
+  .margin-col { width: 230px; border-left: 1px solid var(--border); background: #fbfaf9; position: relative; }
+  .margin-empty { font-size: 11px; color: #b3b0ab; text-align: center; margin-top: 36px; letter-spacing: 0.02em; }
+  .comment-card {
+    position: absolute; left: 14px; right: 14px; top: 218px;
+    background: #fff; border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    opacity: 0; transform: translateY(10px);
+    transition: opacity 0.45s ease, transform 0.45s ease;
+  }
+  .comment-card.on { opacity: 1; transform: none; }
+  .cc-head { display: flex; align-items: center; gap: 7px; }
+  .cc-ava { width: 20px; height: 20px; border-radius: 50%; background: var(--claude); color: #fff; font-size: 9.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+  .cc-name { font-size: 11px; font-weight: 600; }
+  .cc-meta { font-size: 9.5px; color: var(--muted); }
+  .cc-body { font-size: 11.5px; line-height: 1.5; margin-top: 7px; color: #2e2e2e; }
+
+  /* ---------- terminal window ---------- */
+  .term {
+    position: absolute; right: 96px; bottom: 88px;
+    width: 600px; border-radius: 12px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.14); background: var(--term-bg);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.65);
+    opacity: 0; transform: translateY(26px);
+    transition: opacity 0.55s ease, transform 0.55s cubic-bezier(.22,1,.36,1);
+  }
+  .term.on { opacity: 1; transform: none; }
+  .term-head {
+    display: flex; align-items: center; gap: 6px; padding: 9px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .term-dot { width: 9px; height: 9px; border-radius: 50%; background: #fff; opacity: 0.14; }
+  .term-label { margin-left: 8px; font-family: var(--font-mono); font-size: 10px; color: #fff; opacity: 0.4; letter-spacing: 0.04em; }
+  .term-body {
+    padding: 12px 14px; height: 196px;
+    font-family: var(--font-mono); font-size: 11.5px; line-height: 1.8;
+    display: flex; flex-direction: column; justify-content: flex-end;
+  }
+  .tl { white-space: pre-wrap; min-height: 0; }
+  .tl.cmd { color: rgba(255,255,255,0.9); }
+  .tl.out { color: rgba(255,255,255,0.55); }
+  .tl.muted { color: rgba(255,255,255,0.35); }
+  .tl .p { color: var(--gold); margin-right: 7px; }
+  .tcursor { display: inline-block; width: 7px; height: 1.05em; vertical-align: text-bottom; background: rgba(255,255,255,0.7); animation: blink 1s steps(1) infinite; }
+
+  /* ---------- captions ---------- */
+  .caption {
+    position: absolute; left: 50%; bottom: 22px; transform: translate(-50%, 6px);
+    width: max-content; max-width: 1200px; text-align: center;
+    padding: 11px 26px; border-radius: 999px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.14);
+    font-size: 23px; font-weight: 500; letter-spacing: -0.01em;
+    color: #fff;
+    opacity: 0;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .caption.on { opacity: 1; transform: translate(-50%, 0); }
+  .caption b { color: var(--gold); font-weight: 600; }
+
+  /* ---------- end card ---------- */
+  .endcard {
+    position: absolute; inset: 0; background: #0a0908;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.8s ease; pointer-events: none;
+  }
+  .endcard.on { opacity: 1; }
+  .endcard .keycap {
+    width: 64px; height: 64px; border-radius: 16px; font-size: 38px;
+    background: #fff; color: #111;
+    box-shadow: 0 4px 0 rgba(0,0,0,0.5), inset 0 2px 0 rgba(255,255,255,0.6);
+  }
+  .end-name { margin-top: 26px; font-size: 44px; font-weight: 600; letter-spacing: -0.03em; color: #fff; }
+  .end-byline { margin-top: 8px; font-size: 13.5px; font-weight: 500; letter-spacing: 0.02em; color: rgba(255,255,255,0.4); }
+  .end-tag { margin-top: 22px; font-size: 19px; color: rgba(255,255,255,0.62); font-weight: 400; }
+  .end-tag.strong { margin-top: 4px; color: #fff; font-weight: 500; }
+  .end-row { margin-top: 34px; display: flex; align-items: center; gap: 14px; }
+  .end-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    border: 1px solid rgba(255,255,255,0.18); border-radius: 999px;
+    padding: 8px 16px; font-size: 13.5px; color: rgba(255,255,255,0.85); font-weight: 500;
+  }
+  .end-pill svg { width: 15px; height: 15px; fill: currentColor; opacity: 0.9; }
+  .end-url { font-family: var(--font-mono); font-size: 13px; color: rgba(255,255,255,0.5); letter-spacing: 0.01em; }
+  .endcard > * { opacity: 0; transform: translateY(10px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .endcard.on > * { opacity: 1; transform: none; }
+  .endcard.on .end-name { transition-delay: 0.1s; }
+  .endcard.on .end-byline { transition-delay: 0.16s; }
+  .endcard.on .end-tag { transition-delay: 0.3s; }
+  .endcard.on .end-tag.strong { transition-delay: 0.5s; }
+  .endcard.on .end-row { transition-delay: 0.68s; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- intro story -->
+  <div class="intro" id="intro">
+    <div class="intro-line hello" id="i1">Hello.</div>
+    <div class="intro-line" id="i2">Coding agents changed how I work.<br /><span class="dim">Skills, specs, plans. It&rsquo;s all markdown now.</span></div>
+    <div class="intro-line" id="i3">Notion was too much.<br /><span class="dim">Google&nbsp;Docs was built for humans.</span></div>
+    <div class="intro-line" id="i4">I wanted docs that humans and agents<br />write together. So I built <b>this</b>.</div>
+  </div>
+
+  <!-- browser / editor -->
+  <div class="browser" id="browser">
+    <div class="chrome">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <div class="urlbar"><span class="lock">&#128274;</span>mdocs.datacompany.dev/d/auth-migration</div>
+    </div>
+    <div class="topbar">
+      <span class="wordmark"><span class="keycap">m</span><span class="name">mdocs</span></span>
+      <span class="tb-divider"></span>
+      <span class="doc-title">Auth Migration</span>
+      <span class="doc-saved">Saved just now</span>
+      <div class="tb-right">
+        <span class="avatars">
+          <span class="avatar peer">A</span>
+          <span class="avatar you">J</span>
+          <span class="avatar claude" id="claude-ava">C</span>
+        </span>
+        <span class="mode-toggle">
+          <span class="seg active" id="seg-edit">Edit</span>
+          <span class="seg" id="seg-view">View</span>
+          <span class="click-ring" id="click-ring"></span>
+        </span>
+        <span class="btn">Copy</span>
+        <span class="btn dark">Share</span>
+      </div>
+    </div>
+    <div class="app-body" id="app-body">
+      <div class="sidebar">
+        <div class="ws-name"><span class="ws-badge"></span>acme</div>
+        <div class="doc-item active"><span class="fico">&#9670;</span>auth-migration.md</div>
+        <div class="doc-item"><span class="fico">&#9671;</span>api-v2-spec.md</div>
+        <div class="doc-item"><span class="fico">&#9671;</span>runbook.md</div>
+        <div class="doc-item"><span class="fico">&#9671;</span>retro.md</div>
+      </div>
+
+      <div class="pane-src"><span class="h"># Auth Migration</span>
+
+<span class="h">## This week</span>
+- Ship the token refresh endpoint
+- Add rate limiting to /login
+- <span id="src-typed"></span><span class="caret" id="src-caret"></span><span class="agent-block" id="src-agent">
+
+<span class="h flashable">## Rollout plan</span>
+<span class="flashable">**Phase 1:** Dual-issue JWTs and legacy sessions behind a flag.</span>
+<span class="flashable">**Phase 2:** Cut reads over, keep legacy verify for 30 days.</span></span></div>
+
+      <div class="pane-prev">
+        <h1>Auth Migration</h1>
+        <h2>This week</h2>
+        <ul>
+          <li>Ship the token refresh endpoint</li>
+          <li>Add rate limiting to /login</li>
+          <li id="prev-typed-li" style="display:none"><span id="prev-typed"></span></li>
+        </ul>
+        <div class="agent-block" id="prev-agent">
+          <span class="claude-chip">Claude</span>
+          <h2 class="flashable">Rollout plan</h2>
+          <p class="flashable"><b>Phase 1:</b> Dual-issue JWTs and legacy sessions behind a flag.</p>
+          <p class="flashable"><b>Phase 2:</b> Cut reads over, <span class="hl" id="hl-refund">keep legacy verify for 30 days</span>.</p>
+        </div>
+      </div>
+
+      <div class="margin-col">
+        <div class="margin-empty">COMMENTS</div>
+        <div class="comment-card" id="comment-card">
+          <div class="cc-head">
+            <span class="cc-ava">C</span>
+            <div>
+              <div class="cc-name">Claude <span style="font-weight:400;color:var(--muted)">· your agent</span></div>
+              <div class="cc-meta">just now · via CLI</div>
+            </div>
+          </div>
+          <div class="cc-body">Is 30 days enough? Some mobile clients only refresh tokens every 45.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- terminal -->
+  <div class="term" id="term">
+    <div class="term-head">
+      <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
+      <span class="term-label">claude — ~/acme-api</span>
+    </div>
+    <div class="term-body" id="term-body"></div>
+  </div>
+
+  <!-- captions -->
+  <div class="caption" id="cap1">Markdown docs your whole team edits <b>live</b>.</div>
+  <div class="caption" id="cap2">Your <b>agent</b> works in the same doc, right from the CLI.</div>
+  <div class="caption" id="cap3">Edits and comments land live, <b>signed by your agent</b>.</div>
+  <div class="caption" id="cap4">Source when you&rsquo;re writing. <b>A doc when you&rsquo;re reading.</b></div>
+
+  <!-- end card -->
+  <div class="endcard" id="endcard">
+    <span class="keycap">m</span>
+    <div class="end-name">mdocs</div>
+    <div class="end-byline">by The Data Company</div>
+    <div class="end-tag">A doc editor for humans.</div>
+    <div class="end-tag strong">A CLI for your agents.</div>
+    <div class="end-row">
+      <span class="end-pill">
+        <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        Open source
+      </span>
+      <span class="end-url">mdocs.datacompany.dev</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---------- timeline (ms) ----------
+  // intro story beats (all black)
+  const I = {
+    i1: [200, 1300],     // Hello.
+    i2: [1400, 3500],    // agents changed how I work
+    i3: [3600, 5600],    // notion / google docs
+    i4: [5700, 7900],    // so I built mdocs
+    off: 7900,           // intro fades, demo begins
+  }
+  const D = 8200         // demo time origin
+
+  const T = {
+    browserIn:  D,
+    humanType:  D + 400,    // human types the third bullet
+    cap1:       [D + 300, D + 2600],
+    termIn:     D + 1800,
+    pullCmd:    D + 2100,
+    pullOut:    D + 2850,
+    draft:      D + 3050,
+    pushCmd:    D + 3500,
+    pushOut:    D + 4550,
+    sectionIn:  D + 4750,   // agent's section lands in the editor
+    cap2:       [D + 2700, D + 5500],
+    commentCmd: D + 5100,
+    commentOut: D + 6450,
+    card:       D + 6650,
+    cap3:       [D + 5700, D + 7400],
+    toggle:     D + 7600,   // Edit → View
+    cap4:       [D + 7500, D + 9100],
+    endIn:      D + 9500,
+    endOut:     D + 12400,
+    total:      D + 13000,
+  }
+
+  const HUMAN_TEXT = 'Migrate sessions to JWT'
+  const HUMAN_CPS = 24
+  const CPS = 55
+
+  const TERM_EVENTS = [
+    { kind: 'cmd',   at: T.pullCmd,    text: 'mdocs pull 9d2f71c4 auth-migration.md' },
+    { kind: 'out',   at: T.pullOut,    text: 'Pulled "Auth Migration" → auth-migration.md (version 12)' },
+    { kind: 'muted', at: T.draft,      text: '… drafting the rollout plan' },
+    { kind: 'cmd',   at: T.pushCmd,    text: 'mdocs push auth-migration.md -m "Draft rollout plan"' },
+    { kind: 'out',   at: T.pushOut,    text: 'Pushed auth-migration.md (version 13)' },
+    { kind: 'cmd',   at: T.commentCmd, text: 'mdocs comments add 9d2f71c4 "Check the legacy verify window." --as Claude' },
+    { kind: 'out',   at: T.commentOut, text: "Added comment as Claude (you@acme.dev's agent)" },
+  ]
+
+  const typed = (text, t, start, cps) =>
+    t <= start ? '' : text.slice(0, Math.max(0, Math.floor(((t - start) / 1000) * cps)))
+
+  // ---------- elements ----------
+  const $ = (id) => document.getElementById(id)
+  const els = {
+    browser: $('browser'), term: $('term'), termBody: $('term-body'),
+    srcTyped: $('src-typed'), srcCaret: $('src-caret'),
+    prevLi: $('prev-typed-li'), prevTyped: $('prev-typed'),
+    srcAgent: $('src-agent'), prevAgent: $('prev-agent'),
+    claudeAva: $('claude-ava'), card: $('comment-card'), hl: $('hl-refund'),
+    cap1: $('cap1'), cap2: $('cap2'), cap3: $('cap3'), cap4: $('cap4'),
+    endcard: $('endcard'), stage: $('stage'),
+    intro: $('intro'), i1: $('i1'), i2: $('i2'), i3: $('i3'), i4: $('i4'),
+    appBody: $('app-body'), segEdit: $('seg-edit'), segView: $('seg-view'), ring: $('click-ring'),
+  }
+
+  // build terminal lines once
+  const termLines = TERM_EVENTS.map((ev) => {
+    const line = document.createElement('div')
+    line.className = 'tl ' + ev.kind
+    if (ev.kind === 'cmd') {
+      const p = document.createElement('span'); p.className = 'p'; p.textContent = '$'
+      line.appendChild(p)
+    }
+    const span = document.createElement('span')
+    line.appendChild(span)
+    line.style.display = 'none'
+    els.termBody.appendChild(line)
+    return { ...ev, line, span }
+  })
+  const tcursor = document.createElement('div')
+  tcursor.innerHTML = '<span class="p" style="color:var(--gold);font-family:var(--font-mono)">$</span> <span class="tcursor"></span>'
+  tcursor.className = 'tl cmd'
+  els.termBody.appendChild(tcursor)
+
+  const setOn = (el, on) => el.classList.toggle('on', on)
+
+  // ---------- render one frame from t ----------
+  function render(t) {
+    // intro story
+    els.intro.classList.toggle('off', t >= I.off)
+    setOn(els.i1, t >= I.i1[0] && t < I.i1[1])
+    setOn(els.i2, t >= I.i2[0] && t < I.i2[1])
+    setOn(els.i3, t >= I.i3[0] && t < I.i3[1])
+    setOn(els.i4, t >= I.i4[0] && t < I.i4[1])
+
+    setOn(els.browser, t >= T.browserIn && t < T.endIn + 600)
+
+    // human typing (source + live preview)
+    const ht = typed(HUMAN_TEXT, t, T.humanType, HUMAN_CPS)
+    els.srcTyped.textContent = ht
+    els.prevLi.style.display = ht ? '' : 'none'
+    els.prevTyped.textContent = ht
+    els.srcCaret.style.display = t < T.sectionIn ? '' : 'none'
+
+    // terminal
+    setOn(els.term, t >= T.termIn)
+    let cmdActive = false
+    for (const ev of termLines) {
+      if (t < ev.at) { ev.line.style.display = 'none'; continue }
+      ev.line.style.display = ''
+      if (ev.kind === 'cmd') {
+        const s = typed(ev.text, t, ev.at, CPS)
+        ev.span.textContent = s
+        if (s.length < ev.text.length) cmdActive = true
+      } else {
+        ev.span.textContent = ev.text
+      }
+    }
+    tcursor.style.display = cmdActive ? 'none' : ''
+
+    // agent section lands
+    setOn(els.srcAgent, t >= T.sectionIn)
+    setOn(els.prevAgent, t >= T.sectionIn)
+    setOn(els.claudeAva, t >= T.sectionIn)
+
+    // comment + anchor highlight
+    setOn(els.card, t >= T.card)
+    setOn(els.hl, t >= T.card)
+
+    // edit → view toggle
+    const viewing = t >= T.toggle
+    els.appBody.classList.toggle('viewmode', viewing)
+    els.segEdit.classList.toggle('active', !viewing)
+    els.segView.classList.toggle('active', viewing)
+    els.ring.classList.toggle('go', t >= T.toggle - 250 && t < T.toggle + 700)
+
+    // captions
+    setOn(els.cap1, t >= T.cap1[0] && t < T.cap1[1])
+    setOn(els.cap2, t >= T.cap2[0] && t < T.cap2[1])
+    setOn(els.cap3, t >= T.cap3[0] && t < T.cap3[1])
+    setOn(els.cap4, t >= T.cap4[0] && t < T.cap4[1])
+
+    // end card
+    setOn(els.endcard, t >= T.endIn && t < T.endOut)
+  }
+
+  // ---------- loop ----------
+  let start = performance.now()
+  let paused = false
+  let pausedAt = 0
+
+  // ?t=12000 freezes the loop at that millisecond (handy for stills)
+  // ?layout=square restages to 1080x1080 for phone / X
+  const params = new URLSearchParams(location.search)
+  const freezeT = params.get('t')
+  const isSquare = params.get('layout') === 'square'
+  if (isSquare) document.body.classList.add('square')
+
+  function tick(now) {
+    if (!paused) render((now - start) % T.total)
+    requestAnimationFrame(tick)
+  }
+  if (freezeT !== null) {
+    paused = true
+    document.documentElement.style.setProperty('--no-anim', '1')
+    document.body.classList.add('frozen')
+    render(Math.min(+freezeT, T.total - 1))
+  } else {
+    requestAnimationFrame(tick)
+  }
+
+  // ---------- scale to window ----------
+  function fit() {
+    const sw = isSquare ? 1080 : 1600
+    const sh = isSquare ? 1080 : 900
+    const s = Math.min(innerWidth / sw, innerHeight / sh)
+    els.stage.style.transform = `translate(-50%, -50%) scale(${s})`
+  }
+  fit()
+  addEventListener('resize', fit)
+
+  // ---------- controls ----------
+  addEventListener('keydown', (e) => {
+    if (e.key === ' ') {
+      e.preventDefault()
+      if (paused) { start = performance.now() - pausedAt } else { pausedAt = (performance.now() - start) % T.total }
+      paused = !paused
+    } else if (e.key === 'r') {
+      start = performance.now(); paused = false
+    } else if (e.key === 'f') {
+      document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()
+    }
+  })
+
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    paused = true
+    render(T.card + 400) // hold the richest frame
+  }
+</script>
+</body>
+</html>

@@ -6,7 +6,7 @@ truth. Live at **[mdocs.datacompany.dev](https://mdocs.datacompany.dev)**.
 
 This repo is the **web app** (server + web editor + shared core). The terminal
 client lives in its own repo: **[TheDataCo/mdocs](https://github.com/TheDataCo/mdocs)**
-(`npm i -g mdocs`).
+(`npm i -g @thedataco/mdocs`).
 
 ## Why
 
@@ -44,15 +44,25 @@ including edits an **agent** pushes from the CLI while humans type in the browse
   and the merge base for CLI push
 
 **CLI ([TheDataCo/mdocs](https://github.com/TheDataCo/mdocs))**
-- `auth login` (browser device-authorization flow), `whoami`, `ls`, `pull`, and
+
+```sh
+npm i -g @thedataco/mdocs
+mdocs auth login
+```
+
+- `pull` / `push -m "why"` (server-side 3-way merge) / `new` / `cat` / `ls`
+- `history` & `revert` — versions with author, source, and message
+- `comments` — list / add / resolve; agent comments are signed as
+  "you@example.com's agent" (`--as "Claude"`)
+- `trash` — list, read, and restore recently deleted docs and workspaces
+- `share` by email or link; `skills install` (Claude + Codex);
   `instructions` (an llm.txt-style guide for agents)
 
 ## Roadmap
 
-- `mdocs push` — server-side 3-way merge (base version → working vs base → head),
-  with `--message`; `revert` to any prior version
-- Comments (resolvable; a task channel for agents) and SSE notifications when an
-  agent updates a doc
+- SSE notifications when an agent updates a doc
+- Editor feel: inline live markdown styling, slash menu, code highlighting
+- Purge job for trash items past their retention window
 
 ## Repo layout
 

@@ -268,6 +268,16 @@ export function DocListPage() {
           <button className="ws-item new" onClick={onNewWorkspace}>
             + New workspace
           </button>
+          <a
+            className="ws-item new"
+            href="https://github.com/TheDataCo/mdocs"
+            target="_blank"
+            rel="noreferrer"
+            title="Install the mdocs CLI — pull, edit, and push docs from your terminal or agent"
+          >
+            <span className="ws-glyph">⌨</span>
+            Get the CLI
+          </a>
         </aside>
 
         <main className="content">

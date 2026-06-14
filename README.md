@@ -104,6 +104,12 @@ The server is a single Node process serving both the API/websocket and the built
 web app; it needs a `DATABASE_URL`, `CLERK_SECRET_KEY`, and a `COLLAB_TOKEN`. A
 `railway.json` is included for Railway (`railway up`), but any Node host works.
 
+## Contributing
+
+PRs welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md). Commits must be signed off
+(`git commit -s`), and `pnpm lint`, `pnpm -r typecheck`, and the web build run in
+CI on every PR.
+
 ## License
 
 **AGPL-3.0-only** (see [LICENSE](./LICENSE)) — free to self-host; if you run a

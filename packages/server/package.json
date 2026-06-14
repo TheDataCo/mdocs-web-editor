@@ -8,7 +8,10 @@
     "start": "tsx src/index.ts",
     "db:push": "drizzle-kit push",
     "typecheck": "tsc --noEmit",
-    "sync-check": "tsx scripts/sync-check.ts"
+    "sync-check": "tsx scripts/sync-check.ts",
+    "workspace-check": "tsx scripts/workspace-check.ts",
+    "link-check": "tsx scripts/link-check.ts",
+    "cli-auth-check": "tsx scripts/cli-auth-check.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.5.0",

@@ -5,6 +5,8 @@ import type { Hocuspocus } from '@hocuspocus/server'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import { logger } from 'hono/logger'
+import { HTTPException } from 'hono/http-exception'
 import { DOC_TEXT_FIELD } from '@mdocs/core'
 import { API_TOKEN_PREFIX, authenticate, issueApiToken, type Principal } from './auth.js'
 import { userPlanSlug } from './billing.js'
@@ -62,6 +64,19 @@ type Vars = { principal: Principal }
 
 export function createApi(hocuspocus: Hocuspocus) {
   const app = new Hono<{ Variables: Vars }>()
+
+  // Request logging to stdout (Railway/Docker capture this). Skip the frequent
+  // health check so it doesn't drown out real traffic.
+  const log = logger()
+  app.use('*', (c, next) => (c.req.path === '/healthz' ? next() : log(c, next)))
+
+  // Surface unhandled errors. Hono otherwise turns a thrown error into a bare
+  // 500 with nothing logged, so real failures would be invisible in Railway.
+  app.onError((err, c) => {
+    if (err instanceof HTTPException) return err.getResponse()
+    console.error(`unhandled error on ${c.req.method} ${c.req.path}:`, err)
+    return c.json({ error: { code: 'server_error', message: 'internal error' } }, 500)
+  })
 
   app.use('/api/*', cors())
   app.get('/healthz', (c) => c.json({ ok: true }))

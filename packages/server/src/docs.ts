@@ -69,6 +69,42 @@ export async function listSharedDocs(userId: string): Promise<SharedDocRow[]> {
   `
 }
 
+/** Doc ids this user has starred — used to annotate listings with `favorite`. */
+export async function favoriteDocIds(userId: string): Promise<Set<string>> {
+  const rows = await sql<{ doc_id: string }[]>`
+    select doc_id from doc_favorites where user_id = ${userId}
+  `
+  return new Set(rows.map((r) => r.doc_id))
+}
+
+/** Star/unstar a doc for a user (idempotent). Caller checks access first. */
+export async function setFavorite(userId: string, docId: string, on: boolean): Promise<void> {
+  if (on) {
+    await sql`
+      insert into doc_favorites (user_id, doc_id) values (${userId}, ${docId})
+      on conflict (user_id, doc_id) do nothing
+    `
+  } else {
+    await sql`delete from doc_favorites where user_id = ${userId} and doc_id = ${docId}`
+  }
+}
+
+/** The "Favorites" view: starred docs the user can still access (owner included). */
+export async function listFavoriteDocs(userId: string): Promise<SharedDocRow[]> {
+  return sql<SharedDocRow[]>`
+    select d.id, d.title, d.workspace_id, d.created_at, d.updated_at,
+      ou.email as owner_email, ou.name as owner_name
+    from doc_favorites f
+    join docs d on d.id = f.doc_id and d.deleted_at is null
+    left join users ou on ou.id = d.owner_id
+    where f.user_id = ${userId} and (
+      d.workspace_id in (select workspace_id from workspace_members where user_id = ${userId})
+      or d.id in (select doc_id from doc_access where user_id = ${userId})
+    )
+    order by d.updated_at desc
+  `
+}
+
 export async function getDoc(id: string): Promise<DocRow | undefined> {
   const [row] = await sql<DocRow[]>`
     select id, title, workspace_id, created_at, updated_at from docs

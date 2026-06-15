@@ -229,6 +229,22 @@ export const apiRequests = pgTable(
   (t) => [index('api_requests_user_time_idx').on(t.userId, t.createdAt)],
 )
 
+// Per-user "favorites" (starred docs). A user may favorite any doc they can
+// access; the row is harmless if access is later revoked (listings re-check).
+export const docFavorites = pgTable(
+  'doc_favorites',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    docId: uuid('doc_id')
+      .notNull()
+      .references(() => docs.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.docId] })],
+)
+
 export const linkShares = pgTable('link_shares', {
   id: uuid('id').primaryKey().defaultRandom(),
   docId: uuid('doc_id')

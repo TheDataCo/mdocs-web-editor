@@ -11,6 +11,7 @@ import {
   deleteWorkspace,
   inviteMember,
   listDocs,
+  listFavorites,
   listShared,
   listTrash,
   listWorkspaces,
@@ -19,12 +20,15 @@ import {
   renameWorkspace,
   restoreDoc,
   restoreWorkspace,
+  setFavorite,
   type Trash,
   type Workspace,
 } from '../api'
 import { Wordmark } from '../components/Wordmark'
 
-// Sentinel "workspace" ids for the virtual Shared and Recently deleted views.
+// Sentinel "workspace" ids for the virtual Favorites, Shared and Recently
+// deleted views.
+const FAVORITES = '__favorites__'
 const SHARED = '__shared__'
 const TRASH = '__trash__'
 
@@ -33,7 +37,7 @@ function daysLeft(deletedAt: string, retentionDays: number): string {
   const days = Math.ceil((expires - Date.now()) / 86400_000)
   return days <= 0 ? 'expires today' : days === 1 ? '1 day left' : `${days} days left`
 }
-type Row = DocMeta & { ownerEmail?: string | null; ownerName?: string | null }
+type Row = DocMeta & { favorite?: boolean; ownerEmail?: string | null; ownerName?: string | null }
 
 function nextUntitled(docs: DocMeta[]): string {
   const nums = docs
@@ -77,8 +81,10 @@ export function DocListPage() {
     })
   }
 
+  const isFavorites = activeId === FAVORITES
   const isShared = activeId === SHARED
   const isTrash = activeId === TRASH
+  const showOwner = isShared || isFavorites
   const active = workspaces.find((w) => w.id === activeId) ?? null
   const filtered = (docs ?? []).filter((d) => d.title.toLowerCase().includes(query.toLowerCase()))
 
@@ -100,9 +106,27 @@ export function DocListPage() {
       return
     }
     setDocs(null)
-    const load = activeId === SHARED ? listShared() : listDocs(activeId)
+    const load =
+      activeId === SHARED ? listShared() : activeId === FAVORITES ? listFavorites() : listDocs(activeId)
     load.then(setDocs, (e) => setError(String(e)))
   }, [activeId])
+
+  function reloadDocs() {
+    const load =
+      activeId === SHARED ? listShared() : activeId === FAVORITES ? listFavorites() : listDocs(activeId!)
+    load.then(setDocs, (e) => setError(String(e)))
+  }
+
+  // Star/unstar. Optimistic; in the Favorites view, unstarring drops the row.
+  function onToggleFavorite(doc: Row) {
+    const next = !doc.favorite
+    setDocs((cur) => {
+      if (!cur) return cur
+      if (isFavorites && !next) return cur.filter((d) => d.id !== doc.id)
+      return cur.map((d) => (d.id === doc.id ? { ...d, favorite: next } : d))
+    })
+    setFavorite(doc.id, next).catch(reloadDocs)
+  }
 
   useEffect(() => {
     const close = () => {
@@ -289,6 +313,14 @@ export function DocListPage() {
             ),
           )}
           <button
+            className={`ws-item ${isFavorites ? 'active' : ''}`}
+            onClick={() => setActiveId(FAVORITES)}
+            title="Documents you've starred"
+          >
+            <span className="ws-glyph">★</span>
+            Favorites
+          </button>
+          <button
             className={`ws-item ${isShared ? 'active' : ''}`}
             onClick={() => setActiveId(SHARED)}
             title="Documents shared with you and ones you've shared"
@@ -312,14 +344,22 @@ export function DocListPage() {
         <main className="content">
           {error && <p className="error">{error}</p>}
           <div className="content-head">
-            <h2>{isTrash ? 'Recently deleted' : isShared ? 'Shared' : (active?.name ?? 'Documents')}</h2>
+            <h2>
+              {isTrash
+                ? 'Recently deleted'
+                : isShared
+                  ? 'Shared'
+                  : isFavorites
+                    ? 'Favorites'
+                    : (active?.name ?? 'Documents')}
+            </h2>
             <div className="content-actions">
               {active?.type === 'team' && !isShared && (
                 <button className="btn" onClick={() => { setInviteOpen((o) => !o); setInviteMsg(null) }}>
                   Invite
                 </button>
               )}
-              {!isShared && !isTrash && (
+              {!isShared && !isTrash && !isFavorites && (
                 <button className="btn primary" onClick={onCreate} disabled={!activeId}>
                   New doc
                 </button>
@@ -410,7 +450,15 @@ export function DocListPage() {
           <div className="doclist compact">
             {docs === null && !error && <p className="muted">Loading…</p>}
             {docs && filtered.length === 0 && (
-              <p className="muted">{query ? 'No matches.' : 'No documents yet — create one.'}</p>
+              <p className="muted">
+                {query
+                  ? 'No matches.'
+                  : isFavorites
+                    ? 'No favorites yet — star a document to keep it here.'
+                    : isShared
+                      ? 'Nothing shared yet.'
+                      : 'No documents yet — create one.'}
+              </p>
             )}
             {filtered.map((d) =>
               renamingDoc === d.id ? (
@@ -430,17 +478,28 @@ export function DocListPage() {
                 <div
                   key={d.id}
                   className={`row ${dragId === d.id ? 'dragging' : ''}`}
-                  draggable={!isShared}
+                  draggable={!isShared && !isFavorites}
                   onDragStart={() => setDragId(d.id)}
                   onDragEnd={() => setDragId(null)}
                   onClick={() => navigate(`/d/${d.id}`)}
                 >
+                  <button
+                    className={`star ${d.favorite ? 'on' : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onToggleFavorite(d)
+                    }}
+                    title={d.favorite ? 'Remove from favorites' : 'Add to favorites'}
+                    aria-label={d.favorite ? 'Remove from favorites' : 'Add to favorites'}
+                  >
+                    {d.favorite ? '★' : '☆'}
+                  </button>
                   <span className="doclist-title">{d.title}</span>
-                  {isShared && (
+                  {showOwner && (
                     <span className="muted row-owner">{d.ownerName || d.ownerEmail || '—'}</span>
                   )}
                   <span className="muted row-date">{new Date(d.updatedAt).toLocaleDateString()}</span>
-                  {!isShared && (
+                  {!isShared && !isFavorites && (
                     <div className="row-menu" onClick={(e) => e.stopPropagation()}>
                       <button
                         className="kebab"

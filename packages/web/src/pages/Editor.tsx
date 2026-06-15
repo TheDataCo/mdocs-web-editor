@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next'
 import * as Y from 'yjs'
-import { createLink, deleteDoc, getDoc, redeemLink, renameDoc, shareDoc } from '../api'
+import { createLink, deleteDoc, getDoc, redeemLink, renameDoc, setFavorite, shareDoc } from '../api'
 import { getToken } from '../auth'
 import { DocTree } from '../components/DocTree'
 import { WS_URL } from '../config'
@@ -51,6 +51,7 @@ export function EditorPage() {
   const [ydoc, setYdoc] = useState<Y.Doc | null>(null)
   const [showResolved, setShowResolved] = useState(false)
   const [hasComments, setHasComments] = useState(false)
+  const [favorite, setFavoriteState] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const navigate = useNavigate()
   const { user } = useUser()
@@ -99,6 +100,7 @@ export function EditorPage() {
         if (cancelled) return
         setMeta(d)
         setCanEdit(d.canEdit)
+        setFavoriteState(d.favorite)
         if (!d.canEdit && localStorage.getItem(`mdocs:view:${id}`) !== 'split') setMode('preview')
       } catch {
         if (cancelled) return
@@ -299,6 +301,12 @@ export function EditorPage() {
     return () => window.removeEventListener('keydown', onKey)
   }, [canEdit])
 
+  function onToggleFavorite() {
+    const next = !favorite
+    setFavoriteState(next) // optimistic
+    setFavorite(id!, next).catch(() => setFavoriteState(!next))
+  }
+
   async function onCopyDoc() {
     await navigator.clipboard?.writeText(text).catch(() => {})
     setDocCopied(true)
@@ -341,6 +349,14 @@ export function EditorPage() {
             aria-label="Document title"
           />
           {canEdit === false && <span className="badge">View only</span>}
+          <button
+            className={`star ${favorite ? 'on' : ''}`}
+            onClick={onToggleFavorite}
+            title={favorite ? 'Remove from favorites' : 'Add to favorites'}
+            aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            {favorite ? '★' : '☆'}
+          </button>
           <span className="spacer" />
           <div className="peers">
             {peers.map((p) => (

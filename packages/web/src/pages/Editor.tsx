@@ -212,8 +212,22 @@ export function EditorPage() {
     provider.on('synced', openBlankInEdit)
 
     // Recompute comment highlights when comments change (and once after sync).
+    // Deferred to a microtask: on initial load the comments Y.Map and the text
+    // land in the same Yjs transaction, and if this observer runs before
+    // yCollab has populated CodeMirror, dispatching ranges past the (still
+    // empty) editor throws — aborting the text-load observer and leaving the
+    // editor blank (Read mode, driven separately, still rendered). Deferring
+    // runs it after the transaction settles; clamping + try/catch are belts.
     const commentsMap = doc.getMap(DOC_COMMENTS_FIELD)
-    const refreshMarks = () => view.dispatch({ effects: setCommentMarks.of(computeCommentMarks(doc)) })
+    const refreshMarks = () =>
+      queueMicrotask(() => {
+        if (viewRef.current !== view) return
+        try {
+          view.dispatch({ effects: setCommentMarks.of(computeCommentMarks(doc, view.state.doc.length)) })
+        } catch {
+          /* a bad anchor must never break the editor */
+        }
+      })
     commentsMap.observe(refreshMarks)
     provider.on('synced', refreshMarks)
 

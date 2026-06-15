@@ -20,14 +20,22 @@ export const commentHighlightField = StateField.define<DecorationSet>({
 
 const mark = Decoration.mark({ class: 'cm-comment-mark' })
 
-export function computeCommentMarks(doc: Y.Doc): DecorationSet {
+// `maxLen` is the length of the CodeMirror document the marks will be applied
+// to. Comment anchors resolve against the Y.Doc, which during load can be
+// populated a transaction ahead of CodeMirror — a range past the editor's end
+// makes dispatch throw, so clamp to maxLen and drop ranges that start past it.
+export function computeCommentMarks(doc: Y.Doc, maxLen = Number.POSITIVE_INFINITY): DecorationSet {
   const ymap = doc.getMap<CommentValue>(DOC_COMMENTS_FIELD)
   const ranges: [number, number][] = []
   for (const c of ymap.values()) {
     if (c.status !== 'open' || !c.anchorStart || !c.anchorEnd) continue
     const s = Y.createAbsolutePositionFromRelativePosition(decodeAnchor(c.anchorStart), doc)
     const e = Y.createAbsolutePositionFromRelativePosition(decodeAnchor(c.anchorEnd), doc)
-    if (s && e && e.index > s.index) ranges.push([s.index, e.index])
+    if (!s || !e) continue
+    const from = s.index
+    const to = Math.min(e.index, maxLen)
+    if (from >= maxLen || to <= from) continue
+    ranges.push([from, to])
   }
   ranges.sort((a, b) => a[0] - b[0] || a[1] - b[1])
   const builder = new RangeSetBuilder<Decoration>()

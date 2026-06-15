@@ -875,6 +875,34 @@ body {
   opacity: 1;
 }
 
+.star {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--muted-foreground);
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.star.on,
+.star:hover {
+  color: #f5b301;
+}
+
+/* In a list row, keep the empty star out of the way until hover; a filled
+   (favorited) star always shows. The topbar star stays fully visible. */
+.doclist .star {
+  opacity: 0;
+}
+
+.doclist .row:hover .star,
+.doclist .star.on {
+  opacity: 1;
+}
+
 .menu {
   position: absolute;
   right: 0;

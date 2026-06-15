@@ -26,16 +26,19 @@ import {
   createDoc,
   createLink,
   docOwnerId,
+  favoriteDocIds,
   getDoc,
   hasDocShare,
   isTrashedDocVisible,
   listDocs,
+  listFavoriteDocs,
   listSharedDocs,
   listTrashedDocs,
   moveDoc,
   redeemLink,
   renameDoc,
   restoreDoc,
+  setFavorite,
   softDeleteDoc,
 } from './docs.js'
 import {
@@ -508,17 +511,39 @@ export function createApi(hocuspocus: Hocuspocus) {
     return ok ? c.json({ ok: true }) : c.json({ error: { code: 'not_found', message: 'not restorable' } }, 404)
   })
 
+  // Tag each doc with whether the calling user has starred it (so the star
+  // renders correctly in any listing). No-op for the service principal.
+  async function withFavorites<T extends { id: string }>(
+    principal: Principal,
+    docs: T[],
+  ): Promise<(T & { favorite: boolean })[]> {
+    if (principal.kind !== 'user' || docs.length === 0) {
+      return docs.map((d) => ({ ...d, favorite: false }))
+    }
+    const fav = await favoriteDocIds(principal.userId)
+    return docs.map((d) => ({ ...d, favorite: fav.has(d.id) }))
+  }
+
   // Docs
   app.get('/api/docs', async (c) => {
     const ws = c.req.query('workspace') || undefined
-    return c.json({ docs: await listDocs(c.get('principal'), ws) })
+    const principal = c.get('principal')
+    return c.json({ docs: await withFavorites(principal, await listDocs(principal, ws)) })
   })
 
   // The "Shared" view: docs shared with you + docs you've shared out (with owner).
   app.get('/api/docs/shared', async (c) => {
     const userId = requireUser(c)
     if (!userId) return c.json({ docs: [] })
-    return c.json({ docs: await listSharedDocs(userId) })
+    return c.json({ docs: await withFavorites(c.get('principal'), await listSharedDocs(userId)) })
+  })
+
+  // The "Favorites" view: docs this user has starred (and can still access).
+  app.get('/api/docs/favorites', async (c) => {
+    const userId = requireUser(c)
+    if (!userId) return c.json({ docs: [] })
+    const docs = await listFavoriteDocs(userId)
+    return c.json({ docs: docs.map((d) => ({ ...d, favorite: true })) })
   })
 
   app.post('/api/docs', async (c) => {
@@ -545,7 +570,29 @@ export function createApi(hocuspocus: Hocuspocus) {
     }
     const doc = await getDoc(id)
     if (!doc) return c.json({ error: { code: 'not_found', message: 'no such doc' } }, 404)
-    return c.json({ doc, canEdit: await canEdit(c.get('principal'), doc.id) })
+    const principal = c.get('principal')
+    const favorite = principal.kind === 'user' ? (await favoriteDocIds(principal.userId)).has(doc.id) : false
+    return c.json({ doc, canEdit: await canEdit(principal, doc.id), favorite })
+  })
+
+  // Star / unstar a doc for the calling user (needs view access).
+  app.put('/api/docs/:id/favorite', async (c) => {
+    const id = c.req.param('id')
+    const userId = requireUser(c)
+    if (!userId) return c.json({ error: { code: 'permission_denied', message: 'sign in' } }, 403)
+    if (!(await canAccess(c.get('principal'), id))) {
+      return c.json({ error: { code: 'not_found', message: 'no such doc' } }, 404)
+    }
+    await setFavorite(userId, id, true)
+    return c.json({ ok: true, favorite: true })
+  })
+
+  app.delete('/api/docs/:id/favorite', async (c) => {
+    const id = c.req.param('id')
+    const userId = requireUser(c)
+    if (!userId) return c.json({ error: { code: 'permission_denied', message: 'sign in' } }, 403)
+    await setFavorite(userId, id, false)
+    return c.json({ ok: true, favorite: false })
   })
 
   // Share links (read-only or editor). Creating one requires edit access.

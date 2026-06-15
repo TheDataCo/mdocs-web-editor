@@ -8,6 +8,7 @@ import { CliAuthPage } from './pages/CliAuth'
 import { DocListPage } from './pages/DocList'
 import { EditorPage } from './pages/Editor'
 import { PricingPage } from './pages/Pricing'
+import { SharedView } from './pages/SharedView'
 import { SignInPage, SignUpPage } from './pages/SignIn'
 import './style.css'
 
@@ -25,9 +26,25 @@ function Protected({ children }: { children: React.ReactNode }) {
   )
 }
 
+// A doc opened with a ?share= token is viewable while logged out: signed-in
+// users get the live editor (which redeems the link); signed-out users get a
+// read-only render with an Edit button that sends them to sign in. Without a
+// share token, signed-out access still redirects to sign-in.
+function DocRoute() {
+  const hasShare = new URLSearchParams(window.location.search).has('share')
+  return (
+    <>
+      <SignedIn>
+        <EditorPage />
+      </SignedIn>
+      <SignedOut>{hasShare ? <SharedView /> : <RedirectToSignIn />}</SignedOut>
+    </>
+  )
+}
+
 const router = createBrowserRouter([
   { path: '/', element: <Protected><DocListPage /></Protected> },
-  { path: '/d/:id', element: <Protected><EditorPage /></Protected> },
+  { path: '/d/:id', element: <DocRoute /> },
   { path: '/cli-auth', element: <Protected><CliAuthPage /></Protected> },
   { path: '/pricing', element: <Protected><PricingPage /></Protected> },
   { path: '/account', element: <Protected><AccountPage /></Protected> },

@@ -221,6 +221,22 @@ export async function getDoc(id: string): Promise<DocDetail> {
   return { ...toMeta(doc), canEdit, favorite: !!favorite }
 }
 
+export interface SharedDocView {
+  id: string
+  title: string
+  content: string
+  role: 'viewer' | 'editor'
+}
+
+// Public read of a doc via a share-link token — no auth header (the endpoint is
+// allowlisted server-side). Lets a logged-out visitor view before signing in.
+export async function getSharedDoc(id: string, token: string): Promise<SharedDocView> {
+  const res = await fetch(`${API_URL}/api/share/${id}?token=${encodeURIComponent(token)}`)
+  if (!res.ok) throw new Error(`share ${res.status}`)
+  const { doc, content, role } = await res.json()
+  return { id: doc.id, title: doc.title, content, role }
+}
+
 export async function createLink(id: string, role: 'viewer' | 'editor'): Promise<string> {
   const { token } = await request(`/api/docs/${id}/links`, { method: 'POST', body: JSON.stringify({ role }) })
   return token

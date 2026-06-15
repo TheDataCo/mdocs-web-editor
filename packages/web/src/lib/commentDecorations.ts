@@ -11,7 +11,19 @@ export const setCommentMarks = StateEffect.define<DecorationSet>()
 export const commentHighlightField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
   update(deco, tr) {
-    deco = deco.map(tr.changes)
+    if (tr.docChanged) {
+      // Mapping can throw if the set holds a position past the change's start
+      // doc — e.g. marks computed against the Y.Doc land before yCollab's
+      // initial insert (a "changeset of length 0") populates CodeMirror. That
+      // throw runs inside transaction application, so it would corrupt the
+      // editor for EVERY later transaction (blank pane, typing does nothing).
+      // Drop stale marks instead; refreshMarks repopulates them, clamped.
+      try {
+        deco = deco.map(tr.changes)
+      } catch {
+        deco = Decoration.none
+      }
+    }
     for (const e of tr.effects) if (e.is(setCommentMarks)) deco = e.value
     return deco
   },

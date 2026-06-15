@@ -242,6 +242,28 @@ export async function createLink(id: string, role: 'viewer' | 'editor'): Promise
   return token
 }
 
+export interface DocVersion {
+  id: string
+  n: number
+  source: string
+  message: string | null
+  authorEmail: string | null
+  createdAt: string
+}
+
+export async function listVersions(id: string): Promise<DocVersion[]> {
+  const { versions } = await request(`/api/docs/${id}/versions`)
+  return versions
+}
+
+export async function getVersionContent(id: string, n: number): Promise<string> {
+  const res = await fetch(`${API_URL}/api/docs/${id}/versions/${n}`, {
+    headers: { Authorization: `Bearer ${await getToken()}` },
+  })
+  if (!res.ok) throw new Error(`version ${res.status}`)
+  return res.text()
+}
+
 export async function redeemLink(id: string, token: string): Promise<boolean> {
   try {
     await request(`/api/docs/${id}/links/redeem`, { method: 'POST', body: JSON.stringify({ token }) })

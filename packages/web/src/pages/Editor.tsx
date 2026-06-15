@@ -13,7 +13,18 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next'
 import * as Y from 'yjs'
-import { createLink, deleteDoc, getDoc, redeemLink, renameDoc, setFavorite, shareDoc } from '../api'
+import {
+  createLink,
+  deleteDoc,
+  type DocVersion,
+  getDoc,
+  getVersionContent,
+  listVersions,
+  redeemLink,
+  renameDoc,
+  setFavorite,
+  shareDoc,
+} from '../api'
 import { getToken } from '../auth'
 import { DocTree } from '../components/DocTree'
 import { WS_URL } from '../config'
@@ -53,6 +64,9 @@ export function EditorPage() {
   const [hasComments, setHasComments] = useState(false)
   const [favorite, setFavoriteState] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [versions, setVersions] = useState<DocVersion[] | null>(null)
+  const [viewingVersion, setViewingVersion] = useState<{ n: number; content: string } | null>(null)
   const navigate = useNavigate()
   const { user } = useUser()
   const displayName = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Someone'
@@ -89,6 +103,8 @@ export function EditorPage() {
     setMeta(null)
     setText('')
     setCanEdit(null)
+    setHistoryOpen(false)
+    setViewingVersion(null)
     ;(async () => {
       const share = new URLSearchParams(window.location.search).get('share')
       if (share) {
@@ -307,6 +323,18 @@ export function EditorPage() {
     setFavorite(id!, next).catch(() => setFavoriteState(!next))
   }
 
+  function openHistory() {
+    setShareOpen(false)
+    setHistoryOpen(true)
+    setVersions(null)
+    listVersions(id!).then(setVersions, () => setVersions([]))
+  }
+
+  async function onViewVersion(n: number) {
+    const content = await getVersionContent(id!, n).catch(() => null)
+    if (content !== null) setViewingVersion({ n, content })
+  }
+
   async function onCopyDoc() {
     await navigator.clipboard?.writeText(text).catch(() => {})
     setDocCopied(true)
@@ -385,16 +413,16 @@ export function EditorPage() {
             </button>
             {shareOpen && (
               <div className="menu share-menu">
+                <button onClick={openHistory}>Version history</button>
                 <button onClick={() => setShowResolved((v) => !v)}>
                   {showResolved ? 'Hide resolved comments' : 'Show resolved comments'}
                 </button>
                 {canEdit && (
                   <>
+                    {/* Edit links only for now; read-only links stay supported in
+                        the API + onCopyLink('viewer') for the future. */}
                     <button onClick={() => onCopyLink('editor')}>
-                      {copied === 'editor' ? 'Copied ✓' : 'Copy edit link'}
-                    </button>
-                    <button onClick={() => onCopyLink('viewer')}>
-                      {copied === 'viewer' ? 'Copied ✓' : 'Copy read-only link'}
+                      {copied === 'editor' ? 'Copied ✓' : 'Copy link'}
                     </button>
                     <form
                       className="share-invite"
@@ -459,6 +487,48 @@ export function EditorPage() {
           </div>
         </div>
       </div>
+
+      {historyOpen && (
+        <div className="modal-overlay" onClick={() => setHistoryOpen(false)}>
+          <div className="history-panel" onClick={(e) => e.stopPropagation()}>
+            <header className="history-head">
+              <span>Version history</span>
+              <button className="icon-btn" onClick={() => setHistoryOpen(false)} aria-label="Close">
+                ✕
+              </button>
+            </header>
+            <div className="history-list">
+              {versions === null && <p className="muted">Loading…</p>}
+              {versions?.length === 0 && <p className="muted">No versions yet.</p>}
+              {versions?.map((v) => (
+                <button key={v.id} className="history-row" onClick={() => onViewVersion(v.n)}>
+                  <span className="history-v">v{v.n}</span>
+                  <span className="history-msg">{v.message || v.source}</span>
+                  <span className="muted history-meta">
+                    {v.authorEmail ?? v.source} · {new Date(v.createdAt).toLocaleString()}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewingVersion && (
+        <div className="modal-overlay" onClick={() => setViewingVersion(null)}>
+          <div className="history-viewer" onClick={(e) => e.stopPropagation()}>
+            <header className="history-head">
+              <span>Version {viewingVersion.n}</span>
+              <button className="icon-btn" onClick={() => setViewingVersion(null)} aria-label="Close">
+                ✕
+              </button>
+            </header>
+            <div className="preview-inner history-viewer-body">
+              <Preview text={viewingVersion.content} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

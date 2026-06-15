@@ -277,6 +277,18 @@ export async function createLink(docId: string, role: 'viewer' | 'editor', creat
   return token
 }
 
+/** The role of a valid (unrevoked, unexpired) share link, or null. Lets a
+ * logged-out visitor read a doc via the link without an account. */
+export async function shareLinkRole(docId: string, token: string): Promise<'viewer' | 'editor' | null> {
+  if (!token) return null
+  const [link] = await sql<{ role: 'viewer' | 'editor' }[]>`
+    select role from link_shares
+    where doc_id = ${docId} and token_hash = ${hashShareToken(token)}
+      and revoked_at is null and (expires_at is null or expires_at > now())
+  `
+  return link?.role ?? null
+}
+
 /** Redeem a share link: grant the user doc_access at the link's role (never downgrades). */
 export async function redeemLink(docId: string, token: string, userId: string): Promise<boolean> {
   const [link] = await sql<{ role: string }[]>`

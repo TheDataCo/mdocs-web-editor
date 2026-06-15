@@ -1033,6 +1033,36 @@ body {
   font-size: 14px;
 }
 
+/* Read-only shared view (logged-out share-link visitors). */
+.shared-title {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+  padding: 4px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 360px;
+}
+
+.shared-empty {
+  max-width: 460px;
+  margin: 14vh auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 0 24px;
+}
+
+.shared-empty h1 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 8px 0 0;
+}
+
 .title-input {
   flex: 1;
   max-width: 420px;

@@ -39,6 +39,7 @@ import {
   renameDoc,
   restoreDoc,
   setFavorite,
+  shareLinkRole,
   softDeleteDoc,
 } from './docs.js'
 import {
@@ -88,6 +89,9 @@ export function createApi(hocuspocus: Hocuspocus) {
   app.use('/api/*', async (c, next) => {
     // CLI device-auth start/poll are public — the device code is the secret.
     if (c.req.path === '/api/cli/auth/start' || c.req.path === '/api/cli/auth/poll') return next()
+    // Public read-via-share-link: the link token in the query is the secret, so
+    // logged-out visitors can view (read-only) and be nudged to sign in to edit.
+    if (c.req.path.startsWith('/api/share/')) return next()
     const header = c.req.header('Authorization')
     const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined
     const principal = await authenticate(token)
@@ -198,6 +202,21 @@ export function createApi(hocuspocus: Hocuspocus) {
     const userId = requireUser(c)
     if (!userId) return c.json({ activity: [] })
     return c.json({ activity: await recentActivity(userId, 100) })
+  })
+
+  // Public read of a doc via a share-link token (no auth). Returns the title +
+  // current markdown for a read-only render; the SPA shows Copy + an Edit
+  // button that sends the visitor to sign in (editing always requires an account).
+  app.get('/api/share/:id', async (c) => {
+    const id = c.req.param('id')
+    const role = await shareLinkRole(id, c.req.query('token') ?? '')
+    if (!role) return c.json({ error: { code: 'not_found', message: 'invalid or expired link' } }, 404)
+    const doc = await getDoc(id)
+    if (!doc) return c.json({ error: { code: 'not_found', message: 'no such doc' } }, 404)
+    const ydoc = await loadDocState(id)
+    const text = ydoc.getText(DOC_TEXT_FIELD).toString()
+    ydoc.destroy()
+    return c.json({ doc: { id: doc.id, title: doc.title }, content: text, role })
   })
 
   // Current markdown text of a doc (for CLI pull).

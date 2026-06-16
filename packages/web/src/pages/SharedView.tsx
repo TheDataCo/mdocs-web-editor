@@ -56,7 +56,6 @@ export function SharedView() {
         <div className="topbar">
           <Wordmark />
           <span className="shared-title">{title}</span>
-          <span className="badge">View only</span>
           <span className="spacer" />
           <button className="btn" onClick={onCopy} title="Copy markdown" disabled={state !== 'ready'}>
             {copied ? 'Copied ✓' : 'Copy'}

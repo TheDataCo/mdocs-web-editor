@@ -5,7 +5,7 @@
 // Stripe ids, or plan rows ever belong in this repo.
 
 export interface Entitlements {
-  planName: string // shown in the UI so users know their account ("Self-hosted", "Free", "Pro")
+  planName: string // shown in the UI so users know their account ("Self-hosted", "Hobby", "Pro")
   maxDocs: number // across the user's workspaces
   teamWorkspaces: boolean // may create/own team (collaborative) workspaces
   maxCollaboratorsPerDoc: number // people who can be granted access to a single doc (email + link)
@@ -58,16 +58,16 @@ export function getEntitlements(principal: Principal): Promise<Entitlements> {
  */
 // Plans (by Clerk slug) drive entitlements:
 //   'pro'   → unlocks everything (the paid upgrade; renamed from 'individual')
-//   'hobby' → the $1/mo entry plan (same caps as the old Free tier for now)
-//   anything else (incl. no subscription) → Free tier
+//   anything else → Hobby, the $1/mo entry plan (same caps as the old Free
+//     tier). There is no free tier anymore; existing free users are treated as
+//     Hobby, so any non-Pro plan resolves here.
 // planName undefined → non-browser principal (dd_ token) → unlimited (not
 // enforced on the CLI yet).
 export async function clerkEntitlements(p: Principal): Promise<Entitlements> {
   if (p.kind !== 'user' || p.planName === undefined) return UNLIMITED
   const paid = p.planName === 'pro'
-  const display = p.planName === 'pro' ? 'Pro' : p.planName === 'hobby' ? 'Hobby' : 'Free'
   return {
-    planName: display,
+    planName: paid ? 'Pro' : 'Hobby',
     maxDocs: Infinity, // unlimited personal docs on every plan
     teamWorkspaces: paid,
     maxCollaboratorsPerDoc: paid ? Infinity : 2,

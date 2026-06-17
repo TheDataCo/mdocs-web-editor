@@ -56,20 +56,22 @@ export function getEntitlements(principal: Principal): Promise<Entitlements> {
  * principal (from the session JWT). Wired in only when BILLING=clerk.
  * If features are unknown (non-browser principals like dd_ tokens), stays unlimited.
  */
-// Plans (by slug) drive entitlements: 'individual' (displayed as "Pro" —
-// the Clerk slug predates the rename and existing subscriptions keep it)
-// unlocks everything; anything else (incl. 'free_user') is the Free tier.
+// Plans (by Clerk slug) drive entitlements:
+//   'pro'   → unlocks everything (the paid upgrade; renamed from 'individual')
+//   'hobby' → the $1/mo entry plan (same caps as the old Free tier for now)
+//   anything else (incl. no subscription) → Free tier
 // planName undefined → non-browser principal (dd_ token) → unlimited (not
 // enforced on the CLI yet).
 export async function clerkEntitlements(p: Principal): Promise<Entitlements> {
   if (p.kind !== 'user' || p.planName === undefined) return UNLIMITED
-  const paid = p.planName === 'individual'
+  const paid = p.planName === 'pro'
+  const display = p.planName === 'pro' ? 'Pro' : p.planName === 'hobby' ? 'Hobby' : 'Free'
   return {
-    planName: paid ? 'Pro' : 'Free',
-    maxDocs: Infinity, // unlimited personal docs on both plans
+    planName: display,
+    maxDocs: Infinity, // unlimited personal docs on every plan
     teamWorkspaces: paid,
     maxCollaboratorsPerDoc: paid ? Infinity : 2,
-    maxMembersPerWorkspace: paid ? 5 : 0, // Free can't own team workspaces at all
+    maxMembersPerWorkspace: paid ? 5 : 0, // only Pro can own team workspaces
     versionHistory: paid,
     apiCallsPerMonth: paid ? 10000 : 500,
     trashRetentionDays: paid ? 90 : 15,

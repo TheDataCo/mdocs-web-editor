@@ -137,11 +137,16 @@ export async function inviteMember(workspaceId: string, email: string, role = 'm
 
 export interface DocListItem extends DocMeta {
   favorite: boolean
+  pinned: boolean
 }
 
 export async function listDocs(workspaceId?: string): Promise<DocListItem[]> {
   const { docs } = await request(`/api/docs${workspaceId ? `?workspace=${workspaceId}` : ''}`)
-  return docs.map((d: ApiDoc & { favorite?: boolean }) => ({ ...toMeta(d), favorite: !!d.favorite }))
+  return docs.map((d: ApiDoc & { favorite?: boolean; pinned?: boolean }) => ({
+    ...toMeta(d),
+    favorite: !!d.favorite,
+    pinned: !!d.pinned,
+  }))
 }
 
 export interface SharedDoc extends DocListItem {
@@ -149,10 +154,13 @@ export interface SharedDoc extends DocListItem {
   ownerName: string | null
 }
 
-function toSharedDoc(d: ApiDoc & { owner_email?: string; owner_name?: string; favorite?: boolean }): SharedDoc {
+function toSharedDoc(
+  d: ApiDoc & { owner_email?: string; owner_name?: string; favorite?: boolean; pinned?: boolean },
+): SharedDoc {
   return {
     ...toMeta(d),
     favorite: !!d.favorite,
+    pinned: !!d.pinned,
     ownerEmail: d.owner_email ?? null,
     ownerName: d.owner_name ?? null,
   }
@@ -168,8 +176,17 @@ export async function listFavorites(): Promise<SharedDoc[]> {
   return docs.map(toSharedDoc)
 }
 
+export async function listRecent(): Promise<SharedDoc[]> {
+  const { docs } = await request('/api/docs/recent')
+  return docs.map(toSharedDoc)
+}
+
 export async function setFavorite(id: string, on: boolean): Promise<void> {
   await request(`/api/docs/${id}/favorite`, { method: on ? 'PUT' : 'DELETE' })
+}
+
+export async function setPin(id: string, on: boolean): Promise<void> {
+  await request(`/api/docs/${id}/pin`, { method: on ? 'PUT' : 'DELETE' })
 }
 
 export async function createDoc(title: string, workspaceId?: string): Promise<DocMeta> {
@@ -183,6 +200,7 @@ export async function createDoc(title: string, workspaceId?: string): Promise<Do
 export interface DocDetail extends DocMeta {
   canEdit: boolean
   favorite: boolean
+  pinned: boolean
 }
 
 export interface PlanInfo {
@@ -217,8 +235,8 @@ export async function getActivity(): Promise<ActivityItem[]> {
 }
 
 export async function getDoc(id: string): Promise<DocDetail> {
-  const { doc, canEdit, favorite } = await request(`/api/docs/${id}`)
-  return { ...toMeta(doc), canEdit, favorite: !!favorite }
+  const { doc, canEdit, favorite, pinned } = await request(`/api/docs/${id}`)
+  return { ...toMeta(doc), canEdit, favorite: !!favorite, pinned: !!pinned }
 }
 
 export interface SharedDocView {

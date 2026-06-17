@@ -245,6 +245,42 @@ export const docFavorites = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.docId] })],
 )
 
+// Per-user, per-doc "pins": quick-access docs surfaced at the top of their home
+// workspace in the editor tree. Distinct from favorites (which are a global view):
+// a pin is scoped to the doc's workspace, like pinning a file inside a folder.
+export const docPins = pgTable(
+  'doc_pins',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    docId: uuid('doc_id')
+      .notNull()
+      .references(() => docs.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.docId] })],
+)
+
+// Per-user "recently opened" tracking. One row per (user, doc), upserted with a
+// fresh opened_at every time the user opens the doc; powers the Recent view.
+export const docOpens = pgTable(
+  'doc_opens',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    docId: uuid('doc_id')
+      .notNull()
+      .references(() => docs.id),
+    openedAt: timestamp('opened_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.docId] }),
+    index('doc_opens_user_time_idx').on(t.userId, t.openedAt),
+  ],
+)
+
 export const linkShares = pgTable('link_shares', {
   id: uuid('id').primaryKey().defaultRandom(),
   docId: uuid('doc_id')

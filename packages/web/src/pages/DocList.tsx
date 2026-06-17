@@ -12,6 +12,7 @@ import {
   inviteMember,
   listDocs,
   listFavorites,
+  listRecent,
   listShared,
   listTrash,
   listWorkspaces,
@@ -21,13 +22,15 @@ import {
   restoreDoc,
   restoreWorkspace,
   setFavorite,
+  setPin,
   type Trash,
   type Workspace,
 } from '../api'
 import { Wordmark } from '../components/Wordmark'
 
-// Sentinel "workspace" ids for the virtual Favorites, Shared and Recently
-// deleted views.
+// Sentinel "workspace" ids for the virtual Recent, Favorites, Shared and
+// Recently deleted views.
+const RECENT = '__recent__'
 const FAVORITES = '__favorites__'
 const SHARED = '__shared__'
 const TRASH = '__trash__'
@@ -37,7 +40,12 @@ function daysLeft(deletedAt: string, retentionDays: number): string {
   const days = Math.ceil((expires - Date.now()) / 86400_000)
   return days <= 0 ? 'expires today' : days === 1 ? '1 day left' : `${days} days left`
 }
-type Row = DocMeta & { favorite?: boolean; ownerEmail?: string | null; ownerName?: string | null }
+type Row = DocMeta & {
+  favorite?: boolean
+  pinned?: boolean
+  ownerEmail?: string | null
+  ownerName?: string | null
+}
 
 function nextUntitled(docs: DocMeta[]): string {
   const nums = docs
@@ -66,9 +74,9 @@ export function DocListPage() {
   const [cliCopied, setCliCopied] = useState(false)
   const navigate = useNavigate()
   const { has } = useAuth()
-  // Team workspaces require the Pro plan on the hosted instance (Clerk slug is
-  // still 'individual' from before the rename); self-host allows everything.
-  const canTeam = !BILLING_ON || (has?.({ plan: 'individual' }) ?? false)
+  // Team workspaces require the Pro plan on the hosted instance; self-host
+  // allows everything.
+  const canTeam = !BILLING_ON || (has?.({ plan: 'pro' }) ?? false)
 
   function onDropToWorkspace(workspaceId: string) {
     const id = dragId
@@ -81,12 +89,17 @@ export function DocListPage() {
     })
   }
 
+  const isRecent = activeId === RECENT
   const isFavorites = activeId === FAVORITES
   const isShared = activeId === SHARED
   const isTrash = activeId === TRASH
-  const showOwner = isShared || isFavorites
+  const isVirtual = isRecent || isFavorites || isShared || isTrash
+  const showOwner = isShared || isFavorites || isRecent
   const active = workspaces.find((w) => w.id === activeId) ?? null
-  const filtered = (docs ?? []).filter((d) => d.title.toLowerCase().includes(query.toLowerCase()))
+  const filtered = (docs ?? [])
+    .filter((d) => d.title.toLowerCase().includes(query.toLowerCase()))
+    // In a real workspace, pinned docs float to the top (Recent keeps open-order).
+    .sort((a, b) => (isVirtual ? 0 : Number(!!b.pinned) - Number(!!a.pinned)))
 
   useEffect(() => {
     listWorkspaces().then(
@@ -106,15 +119,18 @@ export function DocListPage() {
       return
     }
     setDocs(null)
-    const load =
-      activeId === SHARED ? listShared() : activeId === FAVORITES ? listFavorites() : listDocs(activeId)
-    load.then(setDocs, (e) => setError(String(e)))
+    loadFor(activeId).then(setDocs, (e) => setError(String(e)))
   }, [activeId])
 
+  function loadFor(id: string) {
+    if (id === SHARED) return listShared()
+    if (id === FAVORITES) return listFavorites()
+    if (id === RECENT) return listRecent()
+    return listDocs(id)
+  }
+
   function reloadDocs() {
-    const load =
-      activeId === SHARED ? listShared() : activeId === FAVORITES ? listFavorites() : listDocs(activeId!)
-    load.then(setDocs, (e) => setError(String(e)))
+    loadFor(activeId!).then(setDocs, (e) => setError(String(e)))
   }
 
   // Star/unstar. Optimistic; in the Favorites view, unstarring drops the row.
@@ -126,6 +142,13 @@ export function DocListPage() {
       return cur.map((d) => (d.id === doc.id ? { ...d, favorite: next } : d))
     })
     setFavorite(doc.id, next).catch(reloadDocs)
+  }
+
+  // Pin/unpin (per-workspace quick access). Optimistic.
+  function onTogglePin(doc: Row) {
+    const next = !doc.pinned
+    setDocs((cur) => cur?.map((d) => (d.id === doc.id ? { ...d, pinned: next } : d)) ?? null)
+    setPin(doc.id, next).catch(reloadDocs)
   }
 
   useEffect(() => {
@@ -313,6 +336,14 @@ export function DocListPage() {
             ),
           )}
           <button
+            className={`ws-item ${isRecent ? 'active' : ''}`}
+            onClick={() => setActiveId(RECENT)}
+            title="Documents you've opened recently"
+          >
+            <span className="ws-glyph">◷</span>
+            Recent
+          </button>
+          <button
             className={`ws-item ${isFavorites ? 'active' : ''}`}
             onClick={() => setActiveId(FAVORITES)}
             title="Documents you've starred"
@@ -351,7 +382,9 @@ export function DocListPage() {
                   ? 'Shared'
                   : isFavorites
                     ? 'Favorites'
-                    : (active?.name ?? 'Documents')}
+                    : isRecent
+                      ? 'Recent'
+                      : (active?.name ?? 'Documents')}
             </h2>
             <div className="content-actions">
               {active?.type === 'team' && !isShared && (
@@ -359,7 +392,7 @@ export function DocListPage() {
                   Invite
                 </button>
               )}
-              {!isShared && !isTrash && !isFavorites && (
+              {!isVirtual && (
                 <button className="btn primary" onClick={onCreate} disabled={!activeId}>
                   New doc
                 </button>
@@ -455,9 +488,11 @@ export function DocListPage() {
                   ? 'No matches.'
                   : isFavorites
                     ? 'No favorites yet — star a document to keep it here.'
-                    : isShared
-                      ? 'Nothing shared yet.'
-                      : 'No documents yet — create one.'}
+                    : isRecent
+                      ? 'Nothing opened yet.'
+                      : isShared
+                        ? 'Nothing shared yet.'
+                        : 'No documents yet — create one.'}
               </p>
             )}
             {filtered.map((d) =>
@@ -478,7 +513,7 @@ export function DocListPage() {
                 <div
                   key={d.id}
                   className={`row ${dragId === d.id ? 'dragging' : ''}`}
-                  draggable={!isShared && !isFavorites}
+                  draggable={!isVirtual}
                   onDragStart={() => setDragId(d.id)}
                   onDragEnd={() => setDragId(null)}
                   onClick={() => navigate(`/d/${d.id}`)}
@@ -494,12 +529,28 @@ export function DocListPage() {
                   >
                     {d.favorite ? '★' : '☆'}
                   </button>
+                  {!isVirtual && (
+                    <button
+                      className={`pin ${d.pinned ? 'on' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onTogglePin(d)
+                      }}
+                      title={d.pinned ? 'Unpin from workspace' : 'Pin to workspace'}
+                      aria-label={d.pinned ? 'Unpin' : 'Pin'}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill={d.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 17v5" />
+                        <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+                      </svg>
+                    </button>
+                  )}
                   <span className="doclist-title">{d.title}</span>
                   {showOwner && (
                     <span className="muted row-owner">{d.ownerName || d.ownerEmail || '—'}</span>
                   )}
                   <span className="muted row-date">{new Date(d.updatedAt).toLocaleDateString()}</span>
-                  {!isShared && !isFavorites && (
+                  {!isVirtual && (
                     <div className="row-menu" onClick={(e) => e.stopPropagation()}>
                       <button
                         className="kebab"

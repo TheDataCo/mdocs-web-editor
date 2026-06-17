@@ -431,6 +431,127 @@ body {
   padding: 4px 8px 4px 26px;
 }
 
+/* Filesystem-style tree: sections (Recent/Favorites/Pinned), folder rows, and
+   doc rows with a hover pin toggle. */
+.tree-section {
+  margin-bottom: 10px;
+}
+
+.tree-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+  padding: 6px 8px 2px;
+}
+
+.tree-back {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  padding: 2px 8px 6px;
+}
+
+.tree-back:hover {
+  color: var(--foreground);
+}
+
+.tree-folder-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 6px;
+}
+
+.tree-folder-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-folder-glyph {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.tree-folder {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--foreground);
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+
+.tree-folder:hover {
+  background: var(--muted);
+}
+
+.tree-folder-count {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.tree-folder-chevron {
+  color: var(--muted-foreground);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* Doc row = the doc button + a hover pin toggle, side by side. */
+.tree-row {
+  display: flex;
+  align-items: center;
+}
+
+.tree-row .tree-doc {
+  flex: 1;
+  padding-left: 12px;
+}
+
+.tree-pin {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--muted-foreground);
+  line-height: 0;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+.tree-row:hover .tree-pin,
+.tree-pin.on {
+  opacity: 1;
+}
+
+.tree-pin.on,
+.tree-pin:hover {
+  color: var(--foreground);
+}
+
 .cm-editor {
   height: 100%;
   font-family: var(--font-mono);
@@ -900,6 +1021,34 @@ body {
 
 .doclist .row:hover .star,
 .doclist .star.on {
+  opacity: 1;
+}
+
+/* Pin toggle: mirrors the star — hidden until row hover, stays visible when on. */
+.pin {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--muted-foreground);
+  line-height: 0;
+  padding: 0 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.pin.on,
+.pin:hover {
+  color: var(--foreground);
+}
+
+.doclist .pin {
+  opacity: 0;
+}
+
+.doclist .row:hover .pin,
+.doclist .pin.on {
   opacity: 1;
 }
 

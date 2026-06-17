@@ -105,6 +105,51 @@ export async function listFavoriteDocs(userId: string): Promise<SharedDocRow[]> 
   `
 }
 
+/** Doc ids this user has pinned — used to annotate listings with `pinned`. */
+export async function pinnedDocIds(userId: string): Promise<Set<string>> {
+  const rows = await sql<{ doc_id: string }[]>`
+    select doc_id from doc_pins where user_id = ${userId}
+  `
+  return new Set(rows.map((r) => r.doc_id))
+}
+
+/** Pin/unpin a doc for a user (idempotent). Caller checks access first. */
+export async function setPin(userId: string, docId: string, on: boolean): Promise<void> {
+  if (on) {
+    await sql`
+      insert into doc_pins (user_id, doc_id) values (${userId}, ${docId})
+      on conflict (user_id, doc_id) do nothing
+    `
+  } else {
+    await sql`delete from doc_pins where user_id = ${userId} and doc_id = ${docId}`
+  }
+}
+
+/** Record that the user just opened a doc (upsert opened_at). Caller checks access. */
+export async function recordOpen(userId: string, docId: string): Promise<void> {
+  await sql`
+    insert into doc_opens (user_id, doc_id) values (${userId}, ${docId})
+    on conflict (user_id, doc_id) do update set opened_at = now()
+  `
+}
+
+/** The "Recent" view: docs this user has recently opened and can still access. */
+export async function listRecentDocs(userId: string, limit = 12): Promise<SharedDocRow[]> {
+  return sql<SharedDocRow[]>`
+    select d.id, d.title, d.workspace_id, d.created_at, d.updated_at,
+      ou.email as owner_email, ou.name as owner_name
+    from doc_opens o
+    join docs d on d.id = o.doc_id and d.deleted_at is null
+    left join users ou on ou.id = d.owner_id
+    where o.user_id = ${userId} and (
+      d.workspace_id in (select workspace_id from workspace_members where user_id = ${userId})
+      or d.id in (select doc_id from doc_access where user_id = ${userId})
+    )
+    order by o.opened_at desc
+    limit ${limit}
+  `
+}
+
 export async function getDoc(id: string): Promise<DocRow | undefined> {
   const [row] = await sql<DocRow[]>`
     select id, title, workspace_id, created_at, updated_at from docs

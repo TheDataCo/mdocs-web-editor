@@ -32,13 +32,17 @@ import {
   isTrashedDocVisible,
   listDocs,
   listFavoriteDocs,
+  listRecentDocs,
   listSharedDocs,
   listTrashedDocs,
   moveDoc,
+  pinnedDocIds,
+  recordOpen,
   redeemLink,
   renameDoc,
   restoreDoc,
   setFavorite,
+  setPin,
   shareLinkRole,
   softDeleteDoc,
 } from './docs.js'
@@ -530,39 +534,48 @@ export function createApi(hocuspocus: Hocuspocus) {
     return ok ? c.json({ ok: true }) : c.json({ error: { code: 'not_found', message: 'not restorable' } }, 404)
   })
 
-  // Tag each doc with whether the calling user has starred it (so the star
-  // renders correctly in any listing). No-op for the service principal.
-  async function withFavorites<T extends { id: string }>(
+  // Tag each doc with whether the calling user has starred / pinned it (so the
+  // star + pin render correctly in any listing). No-op for the service principal.
+  async function withFlags<T extends { id: string }>(
     principal: Principal,
     docs: T[],
-  ): Promise<(T & { favorite: boolean })[]> {
+  ): Promise<(T & { favorite: boolean; pinned: boolean })[]> {
     if (principal.kind !== 'user' || docs.length === 0) {
-      return docs.map((d) => ({ ...d, favorite: false }))
+      return docs.map((d) => ({ ...d, favorite: false, pinned: false }))
     }
-    const fav = await favoriteDocIds(principal.userId)
-    return docs.map((d) => ({ ...d, favorite: fav.has(d.id) }))
+    const [fav, pins] = await Promise.all([
+      favoriteDocIds(principal.userId),
+      pinnedDocIds(principal.userId),
+    ])
+    return docs.map((d) => ({ ...d, favorite: fav.has(d.id), pinned: pins.has(d.id) }))
   }
 
   // Docs
   app.get('/api/docs', async (c) => {
     const ws = c.req.query('workspace') || undefined
     const principal = c.get('principal')
-    return c.json({ docs: await withFavorites(principal, await listDocs(principal, ws)) })
+    return c.json({ docs: await withFlags(principal, await listDocs(principal, ws)) })
   })
 
   // The "Shared" view: docs shared with you + docs you've shared out (with owner).
   app.get('/api/docs/shared', async (c) => {
     const userId = requireUser(c)
     if (!userId) return c.json({ docs: [] })
-    return c.json({ docs: await withFavorites(c.get('principal'), await listSharedDocs(userId)) })
+    return c.json({ docs: await withFlags(c.get('principal'), await listSharedDocs(userId)) })
   })
 
   // The "Favorites" view: docs this user has starred (and can still access).
   app.get('/api/docs/favorites', async (c) => {
     const userId = requireUser(c)
     if (!userId) return c.json({ docs: [] })
-    const docs = await listFavoriteDocs(userId)
-    return c.json({ docs: docs.map((d) => ({ ...d, favorite: true })) })
+    return c.json({ docs: await withFlags(c.get('principal'), await listFavoriteDocs(userId)) })
+  })
+
+  // The "Recent" view: docs this user has recently opened (and can still access).
+  app.get('/api/docs/recent', async (c) => {
+    const userId = requireUser(c)
+    if (!userId) return c.json({ docs: [] })
+    return c.json({ docs: await withFlags(c.get('principal'), await listRecentDocs(userId)) })
   })
 
   app.post('/api/docs', async (c) => {
@@ -590,8 +603,16 @@ export function createApi(hocuspocus: Hocuspocus) {
     const doc = await getDoc(id)
     if (!doc) return c.json({ error: { code: 'not_found', message: 'no such doc' } }, 404)
     const principal = c.get('principal')
-    const favorite = principal.kind === 'user' ? (await favoriteDocIds(principal.userId)).has(doc.id) : false
-    return c.json({ doc, canEdit: await canEdit(principal, doc.id), favorite })
+    let favorite = false
+    let pinned = false
+    if (principal.kind === 'user') {
+      const [fav, pins] = await Promise.all([favoriteDocIds(principal.userId), pinnedDocIds(principal.userId)])
+      favorite = fav.has(doc.id)
+      pinned = pins.has(doc.id)
+      // Record the open for the Recent view (best-effort; never blocks the read).
+      recordOpen(principal.userId, doc.id).catch(() => {})
+    }
+    return c.json({ doc, canEdit: await canEdit(principal, doc.id), favorite, pinned })
   })
 
   // Star / unstar a doc for the calling user (needs view access).
@@ -612,6 +633,26 @@ export function createApi(hocuspocus: Hocuspocus) {
     if (!userId) return c.json({ error: { code: 'permission_denied', message: 'sign in' } }, 403)
     await setFavorite(userId, id, false)
     return c.json({ ok: true, favorite: false })
+  })
+
+  // Pin / unpin a doc for the calling user (needs view access).
+  app.put('/api/docs/:id/pin', async (c) => {
+    const id = c.req.param('id')
+    const userId = requireUser(c)
+    if (!userId) return c.json({ error: { code: 'permission_denied', message: 'sign in' } }, 403)
+    if (!(await canAccess(c.get('principal'), id))) {
+      return c.json({ error: { code: 'not_found', message: 'no such doc' } }, 404)
+    }
+    await setPin(userId, id, true)
+    return c.json({ ok: true, pinned: true })
+  })
+
+  app.delete('/api/docs/:id/pin', async (c) => {
+    const id = c.req.param('id')
+    const userId = requireUser(c)
+    if (!userId) return c.json({ error: { code: 'permission_denied', message: 'sign in' } }, 403)
+    await setPin(userId, id, false)
+    return c.json({ ok: true, pinned: false })
   })
 
   // Share links (read-only or editor). Creating one requires edit access.

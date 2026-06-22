@@ -58,6 +58,9 @@ export function DocListPage() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [docs, setDocs] = useState<Row[] | null>(null)
+  // All docs across every workspace the user belongs to — the corpus for the
+  // global search in the top header (loaded separately from the active view).
+  const [allDocs, setAllDocs] = useState<Row[] | null>(null)
   const [trash, setTrash] = useState<Trash | null>(null)
   const [query, setQuery] = useState('')
   const [menuFor, setMenuFor] = useState<string | null>(null)
@@ -101,6 +104,15 @@ export function DocListPage() {
     // In a real workspace, pinned docs float to the top (Recent keeps open-order).
     .sort((a, b) => (isVirtual ? 0 : Number(!!b.pinned) - Number(!!a.pinned)))
 
+  // A non-empty query switches the content area to global, cross-workspace
+  // search results instead of the active view.
+  const q = query.trim()
+  const searching = q.length > 0
+  const wsName = (id: string | null) => workspaces.find((w) => w.id === id)?.name ?? 'Workspace'
+  const results = (allDocs ?? [])
+    .filter((d) => d.title.toLowerCase().includes(q.toLowerCase()))
+    .sort((a, b) => a.title.localeCompare(b.title))
+
   useEffect(() => {
     listWorkspaces().then(
       (ws) => {
@@ -109,6 +121,15 @@ export function DocListPage() {
       },
       (e) => setError(String(e)),
     )
+  }, [])
+
+  // Corpus for global search. Loaded once up front and refreshed whenever the
+  // search field is focused, so results stay reasonably fresh without polling.
+  function reloadAll() {
+    listDocs().then((d) => setAllDocs(d as Row[]), (e) => setError(String(e)))
+  }
+  useEffect(() => {
+    reloadAll()
   }, [])
 
   useEffect(() => {
@@ -141,6 +162,8 @@ export function DocListPage() {
       if (isFavorites && !next) return cur.filter((d) => d.id !== doc.id)
       return cur.map((d) => (d.id === doc.id ? { ...d, favorite: next } : d))
     })
+    // Keep the search corpus in sync so the star reflects in results too.
+    setAllDocs((cur) => cur?.map((d) => (d.id === doc.id ? { ...d, favorite: next } : d)) ?? null)
     setFavorite(doc.id, next).catch(reloadDocs)
   }
 
@@ -229,6 +252,15 @@ export function DocListPage() {
     <>
       <div className="topbar">
         <Wordmark />
+        <input
+          className="topbar-search"
+          type="search"
+          placeholder="Search all documents…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onFocus={reloadAll}
+          aria-label="Search all documents across workspaces"
+        />
         <span className="spacer" />
         <button className="cli-install" onClick={onCopyCli} title="Copy the CLI install command">
           <span className="cli-cmd">npm i -g @thedataco/mdocs</span>
@@ -374,6 +406,41 @@ export function DocListPage() {
 
         <main className="content">
           {error && <p className="error">{error}</p>}
+          {searching && (
+            <>
+              <div className="content-head">
+                <h2>
+                  {results.length} {results.length === 1 ? 'result' : 'results'} for “{q}”
+                </h2>
+              </div>
+              <div className="doclist compact">
+                {allDocs === null && !error && <p className="muted">Searching…</p>}
+                {allDocs && results.length === 0 && (
+                  <p className="muted">No documents match “{q}”.</p>
+                )}
+                {results.map((d) => (
+                  <div key={d.id} className="row" onClick={() => navigate(`/d/${d.id}`)}>
+                    <button
+                      className={`star ${d.favorite ? 'on' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onToggleFavorite(d)
+                      }}
+                      title={d.favorite ? 'Remove from favorites' : 'Add to favorites'}
+                      aria-label={d.favorite ? 'Remove from favorites' : 'Add to favorites'}
+                    >
+                      {d.favorite ? '★' : '☆'}
+                    </button>
+                    <span className="doclist-title">{d.title}</span>
+                    <span className="muted row-owner">{wsName(d.workspaceId)}</span>
+                    <span className="muted row-date">{new Date(d.updatedAt).toLocaleDateString()}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {!searching && (
+          <>
           <div className="content-head">
             <h2>
               {isTrash
@@ -467,16 +534,6 @@ export function DocListPage() {
                 </>
               )}
             </div>
-          )}
-
-          {!isTrash && (
-          <input
-            className="search"
-            type="search"
-            placeholder="Search documents…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
           )}
 
           {!isTrash && (
@@ -589,6 +646,8 @@ export function DocListPage() {
               ),
             )}
           </div>
+          )}
+          </>
           )}
         </main>
       </div>

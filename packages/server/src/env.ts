@@ -41,5 +41,10 @@ export const env = {
   COLLAB_TOKEN: serviceToken(),
   // 'clerk' enables Clerk Billing plan enforcement; unset (self-host) = unlimited.
   BILLING: process.env.BILLING,
+  // OpenRouter key for AI markdown conversion (POST /api/convert). Server-only,
+  // never shipped to browsers. Unset disables the endpoint (returns ai_unavailable).
+  OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+  // Model slug for AI conversion; override to trade cost vs. quality.
+  OPENROUTER_MODEL: process.env.OPENROUTER_MODEL ?? 'qwen/qwen3.6-flash',
   PORT: Number(process.env.PORT ?? 3001),
 }

@@ -14,6 +14,7 @@ import { approveCliAuth, pollCliAuth, startCliAuth } from './cli-auth.js'
 import { addCommentToDoc, listComments, newComment, setCommentStatus } from './comments.js'
 import { clerkEntitlements, getEntitlements, serializeEntitlements } from './entitlements.js'
 import { env } from './env.js'
+import { convertToMarkdown, LlmError } from './llm.js'
 import { callsThisMonth, logRequest, recentActivity } from './usage.js'
 import { applyTextEdits, threeWayMerge } from './merge.js'
 import { loadDocState } from './persistence.js'
@@ -206,6 +207,25 @@ export function createApi(hocuspocus: Hocuspocus) {
     const userId = requireUser(c)
     if (!userId) return c.json({ activity: [] })
     return c.json({ activity: await recentActivity(userId, 100) })
+  })
+
+  // AI: convert raw text (logs, JSON, HTML, …) into clean markdown via OpenRouter.
+  // Stateless — not tied to a doc; the CLI writes the result to a local file.
+  app.post('/api/convert', async (c) => {
+    const userId = requireUser(c)
+    if (!userId) return c.json({ error: { code: 'permission_denied', message: 'sign in to use AI conversion' } }, 403)
+    const body = await c.req.json().catch(() => ({}))
+    const text = typeof body.text === 'string' ? body.text : ''
+    const hint = typeof body.hint === 'string' && body.hint.trim() ? body.hint.trim() : undefined
+    if (!text.trim()) return c.json({ error: { code: 'invalid', message: 'text is required' } }, 400)
+    try {
+      return c.json({ markdown: await convertToMarkdown(text, hint) })
+    } catch (e) {
+      if (e instanceof LlmError) {
+        return c.json({ error: { code: e.code, message: e.message } }, e.code === 'ai_unavailable' ? 503 : 502)
+      }
+      throw e
+    }
   })
 
   // Public read of a doc via a share-link token (no auth). Returns the title +

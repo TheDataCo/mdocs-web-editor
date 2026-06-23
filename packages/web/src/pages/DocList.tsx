@@ -575,37 +575,39 @@ export function DocListPage() {
                   onDragEnd={() => setDragId(null)}
                   onClick={() => navigate(`/d/${d.id}`)}
                 >
-                  <button
-                    className={`star ${d.favorite ? 'on' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onToggleFavorite(d)
-                    }}
-                    title={d.favorite ? 'Remove from favorites' : 'Add to favorites'}
-                    aria-label={d.favorite ? 'Remove from favorites' : 'Add to favorites'}
-                  >
-                    {d.favorite ? '★' : '☆'}
-                  </button>
-                  {!isVirtual && (
-                    <button
-                      className={`pin ${d.pinned ? 'on' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onTogglePin(d)
-                      }}
-                      title={d.pinned ? 'Unpin from workspace' : 'Pin to workspace'}
-                      aria-label={d.pinned ? 'Unpin' : 'Pin'}
-                    >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill={d.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M12 17v5" />
-                        <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
-                      </svg>
-                    </button>
-                  )}
                   <span className="doclist-title">{d.title}</span>
                   {showOwner && (
                     <span className="muted row-owner">{d.ownerName || d.ownerEmail || '—'}</span>
                   )}
+                  <div className="row-actions">
+                    <button
+                      className={`star ${d.favorite ? 'on' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onToggleFavorite(d)
+                      }}
+                      title={d.favorite ? 'Remove from favorites' : 'Add to favorites'}
+                      aria-label={d.favorite ? 'Remove from favorites' : 'Add to favorites'}
+                    >
+                      {d.favorite ? '★' : '☆'}
+                    </button>
+                    {!isVirtual && (
+                      <button
+                        className={`pin ${d.pinned ? 'on' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onTogglePin(d)
+                        }}
+                        title={d.pinned ? 'Unpin from workspace' : 'Pin to workspace'}
+                        aria-label={d.pinned ? 'Unpin' : 'Pin'}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill={d.pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 17v5" />
+                          <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                   <span className="muted row-date">{new Date(d.updatedAt).toLocaleDateString()}</span>
                   {!isVirtual && (
                     <div className="row-menu" onClick={(e) => e.stopPropagation()}>

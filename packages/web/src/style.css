@@ -1146,6 +1146,15 @@ body {
   opacity: 1;
 }
 
+/* Trailing favorite/pin cluster — sits next to the date instead of in a lone
+   left column, so a starred row reads as one unit rather than a floating ★. */
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
 .star {
   border: none;
   background: none;

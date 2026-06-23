@@ -43,6 +43,18 @@ async function request(path: string, init?: RequestInit) {
   return res.json()
 }
 
+// In-editor AI assistant (server-side OpenRouter). 'generate' returns markdown
+// to insert; 'rewrite' returns a replacement for the supplied selection.
+export async function aiAssist(opts: {
+  mode: 'generate' | 'rewrite'
+  instruction: string
+  selection?: string
+  document?: string
+}): Promise<string> {
+  const { output } = await request('/api/ai', { method: 'POST', body: JSON.stringify(opts) })
+  return output
+}
+
 export interface Workspace {
   id: string
   type: 'personal' | 'team'

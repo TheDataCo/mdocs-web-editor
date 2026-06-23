@@ -14,7 +14,7 @@ import { approveCliAuth, pollCliAuth, startCliAuth } from './cli-auth.js'
 import { addCommentToDoc, listComments, newComment, setCommentStatus } from './comments.js'
 import { clerkEntitlements, getEntitlements, serializeEntitlements } from './entitlements.js'
 import { env } from './env.js'
-import { convertToMarkdown, LlmError } from './llm.js'
+import { type AssistMode, convertToMarkdown, LlmError, runAssist } from './llm.js'
 import { callsThisMonth, logRequest, recentActivity } from './usage.js'
 import { applyTextEdits, threeWayMerge } from './merge.js'
 import { loadDocState } from './persistence.js'
@@ -220,6 +220,31 @@ export function createApi(hocuspocus: Hocuspocus) {
     if (!text.trim()) return c.json({ error: { code: 'invalid', message: 'text is required' } }, 400)
     try {
       return c.json({ markdown: await convertToMarkdown(text, hint) })
+    } catch (e) {
+      if (e instanceof LlmError) {
+        return c.json({ error: { code: e.code, message: e.message } }, e.code === 'ai_unavailable' ? 503 : 502)
+      }
+      throw e
+    }
+  })
+
+  // In-editor AI assistant. 'generate' returns markdown to insert (answers a
+  // question / writes a passage); 'rewrite' transforms the supplied selection
+  // and returns a drop-in replacement. Stateless — the client sends the text.
+  app.post('/api/ai', async (c) => {
+    const userId = requireUser(c)
+    if (!userId) return c.json({ error: { code: 'permission_denied', message: 'sign in to use AI' } }, 403)
+    const body = await c.req.json().catch(() => ({}))
+    const mode: AssistMode = body.mode === 'rewrite' ? 'rewrite' : 'generate'
+    const instruction = typeof body.instruction === 'string' ? body.instruction.trim() : ''
+    const selection = typeof body.selection === 'string' ? body.selection : undefined
+    const document = typeof body.document === 'string' ? body.document : undefined
+    if (!instruction) return c.json({ error: { code: 'invalid', message: 'instruction is required' } }, 400)
+    if (mode === 'rewrite' && !selection && !document) {
+      return c.json({ error: { code: 'invalid', message: 'rewrite needs a selection' } }, 400)
+    }
+    try {
+      return c.json({ output: await runAssist({ mode, instruction, selection, document }) })
     } catch (e) {
       if (e instanceof LlmError) {
         return c.json({ error: { code: e.code, message: e.message } }, e.code === 'ai_unavailable' ? 503 : 502)

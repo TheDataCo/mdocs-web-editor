@@ -26,6 +26,7 @@ import {
   shareDoc,
 } from '../api'
 import { getToken } from '../auth'
+import { AiAssist, type AiTrigger } from '../components/AiAssist'
 import { DocTree } from '../components/DocTree'
 import { WS_URL } from '../config'
 import { CommentMargin } from '../components/CommentMargin'
@@ -67,6 +68,10 @@ export function EditorPage() {
   const [historyOpen, setHistoryOpen] = useState(false)
   const [versions, setVersions] = useState<DocVersion[] | null>(null)
   const [viewingVersion, setViewingVersion] = useState<{ n: number; content: string } | null>(null)
+  // AI assistant: the "/" slash menu / prompt panel, and the floating "Ask AI"
+  // button that appears over a non-empty selection.
+  const [ai, setAi] = useState<AiTrigger | null>(null)
+  const [selBtn, setSelBtn] = useState<{ x: number; y: number; from: number; to: number; text: string } | null>(null)
   const navigate = useNavigate()
   const { user } = useUser()
   const displayName = user?.fullName || user?.primaryEmailAddress?.emailAddress || 'Someone'
@@ -94,6 +99,35 @@ export function EditorPage() {
   toggleRef.current = () => setMode(modeRef.current === 'preview' ? 'split' : 'preview')
   const previewToggleRef = useRef(() => {})
   previewToggleRef.current = togglePreview
+
+  // Called from the "/" keymap. Opens the AI slash menu when the cursor is at a
+  // line start or just after whitespace (so "/" still types normally elsewhere).
+  // Returns true to swallow the "/" when it opens the menu.
+  const slashRef = useRef<(view: EditorView) => boolean>(() => false)
+  slashRef.current = (view) => {
+    if (!canEdit) return false
+    const sel = view.state.selection.main
+    if (!sel.empty) return false
+    const before = sel.from === 0 ? '' : view.state.doc.sliceString(sel.from - 1, sel.from)
+    if (before !== '' && !/\s/.test(before)) return false
+    const coords = view.coordsAtPos(sel.from)
+    if (!coords) return false
+    setSelBtn(null)
+    setAi({ kind: 'menu', x: coords.left, y: coords.bottom, at: sel.from })
+    return true
+  }
+  // Called on every selection change. Shows/hides the floating "Ask AI" button.
+  const selRef = useRef<(view: EditorView) => void>(() => {})
+  selRef.current = (view) => {
+    const clear = () => setSelBtn((cur) => (cur ? null : cur))
+    const sel = view.state.selection.main
+    if (sel.empty || !canEdit) return clear()
+    const text = view.state.doc.sliceString(sel.from, sel.to)
+    if (!text.trim()) return clear()
+    const coords = view.coordsAtPos(sel.to)
+    if (!coords) return clear()
+    setSelBtn({ x: coords.left, y: coords.bottom, from: sel.from, to: sel.to, text })
+  }
 
   // Load access: redeem a share link if present in the URL, then fetch the doc
   // + the caller's edit permission. Gate the editor build on this completing.
@@ -201,7 +235,14 @@ export function EditorPage() {
               return true
             },
           },
+          {
+            key: '/',
+            run: (v) => slashRef.current(v),
+          },
         ]),
+        EditorView.updateListener.of((u) => {
+          if (u.selectionSet || u.docChanged) selRef.current(u.view)
+        }),
         keymap.of(yUndoManagerKeymap),
         keymap.of([indentWithTab]), // Tab indents (4 spaces) — enables nested lists
         basicSetup,
@@ -277,6 +318,7 @@ export function EditorPage() {
     const close = () => {
       setShareOpen(false)
       setConfirmDelete(false)
+      setAi(null)
     }
     window.addEventListener('click', close)
     return () => window.removeEventListener('click', close)
@@ -486,6 +528,37 @@ export function EditorPage() {
             )}
           </div>
         </div>
+
+        {ai?.kind === 'menu' && (
+          <div
+            className="ai-menu"
+            style={{ top: Math.min(ai.y + 6, window.innerHeight - 170), left: Math.min(ai.x, window.innerWidth - 220) }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="ai-menu-label">Ask AI</div>
+            <button autoFocus onClick={() => setAi({ kind: 'ask', x: ai.x, y: ai.y, at: ai.at })}>
+              Ask a question
+            </button>
+            <button onClick={() => setAi({ kind: 'write', x: ai.x, y: ai.y, at: ai.at })}>Write with AI</button>
+            <button onClick={() => setAi({ kind: 'doc', x: ai.x, y: ai.y })}>Rewrite document</button>
+          </div>
+        )}
+        {ai && ai.kind !== 'menu' && viewRef.current && (
+          <AiAssist view={viewRef.current} trigger={ai} docText={text} onClose={() => setAi(null)} />
+        )}
+        {selBtn && !ai && (
+          <button
+            className="ai-sel-btn"
+            style={{ top: Math.min(selBtn.y + 6, window.innerHeight - 40), left: selBtn.x }}
+            onClick={(e) => {
+              e.stopPropagation()
+              setAi({ kind: 'selection', x: selBtn.x, y: selBtn.y, from: selBtn.from, to: selBtn.to, text: selBtn.text })
+              setSelBtn(null)
+            }}
+          >
+            ✨ Ask AI
+          </button>
+        )}
       </div>
 
       {historyOpen && (

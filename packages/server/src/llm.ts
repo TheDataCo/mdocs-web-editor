@@ -37,7 +37,7 @@ async function chat(messages: ChatMessage[]): Promise<string> {
         Authorization: `Bearer ${key}`,
         'Content-Type': 'application/json',
         // OpenRouter attribution headers (shown in their dashboard).
-        'HTTP-Referer': 'https://mdocs.datacompany.dev',
+        'HTTP-Referer': 'https://app.usemdocs.com',
         'X-Title': 'mdocs',
       },
       body: JSON.stringify({ model: env.OPENROUTER_MODEL, messages }),

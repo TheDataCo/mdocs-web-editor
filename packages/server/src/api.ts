@@ -144,7 +144,7 @@ export function createApi(hocuspocus: Hocuspocus) {
   // CLI device-authorization flow (`mdocs auth login`)
   app.post('/api/cli/auth/start', async (c) => {
     const { deviceCode, userCode, expiresInSec } = await startCliAuth()
-    const host = c.req.header('host') ?? 'mdocs.datacompany.dev'
+    const host = c.req.header('host') ?? 'app.usemdocs.com'
     const proto = host.startsWith('localhost') ? 'http' : 'https'
     const base = `${proto}://${host}`
     return c.json({
